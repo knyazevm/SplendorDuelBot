@@ -1,0 +1,1297 @@
+{
+  "cards": [
+    {
+      "id": "L1_02",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "take_same_gem"
+    },
+    {
+      "id": "L1_03",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 2,
+        "red": 2,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "take_same_gem"
+    },
+    {
+      "id": "L1_04",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 1,
+        "red": 0,
+        "blue": 0,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_05",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 3,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_06",
+      "level": 1,
+      "cost": {
+        "white": 1,
+        "black": 0,
+        "red": 1,
+        "blue": 1,
+        "green": 1,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_07",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 4,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_08",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 1,
+        "red": 2,
+        "blue": 2,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_09",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 3,
+        "blue": 0,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_10",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 2,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L1_11",
+      "level": 1,
+      "cost": {
+        "white": 3,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_12",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L1_13",
+      "level": 1,
+      "cost": {
+        "white": 1,
+        "black": 1,
+        "red": 1,
+        "blue": 1,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_14",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 3,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_15",
+      "level": 1,
+      "cost": {
+        "white": 4,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_16",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "take_same_gem"
+    },
+    {
+      "id": "L1_17",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 3,
+        "red": 2,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_18",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 3,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_19",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 3,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_20",
+      "level": 1,
+      "cost": {
+        "white": 3,
+        "black": 2,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_21",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 1,
+        "red": 1,
+        "blue": 1,
+        "green": 1,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_22",
+      "level": 1,
+      "cost": {
+        "white": 1,
+        "black": 1,
+        "red": 0,
+        "blue": 1,
+        "green": 1,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_23",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 2,
+        "blue": 0,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L1_24",
+      "level": 1,
+      "cost": {
+        "white": 2,
+        "black": 2,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "take_same_gem"
+    },
+    {
+      "id": "L1_25",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 2,
+        "blue": 0,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "take_same_gem"
+    },
+    {
+      "id": "L1_26",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 3,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_27",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 2,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L1_28",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L1_29",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 3,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 0,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L1_30",
+      "level": 1,
+      "cost": {
+        "white": 1,
+        "black": 1,
+        "red": 1,
+        "blue": 0,
+        "green": 1,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 0,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L1_31",
+      "level": 1,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 4,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": null,
+      "points": 3,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_02",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 4,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "L2_03",
+      "level": 2,
+      "cost": {
+        "white": 2,
+        "black": 2,
+        "red": 0,
+        "blue": 2,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 2,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L2_04",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 6,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": null,
+      "points": 5,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_05",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 2,
+        "blue": 2,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 2,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L2_06",
+      "level": 2,
+      "cost": {
+        "white": 2,
+        "black": 2,
+        "red": 2,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 2,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L2_07",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 3,
+        "red": 0,
+        "blue": 0,
+        "green": 4,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": "take_opponent_gem"
+    },
+    {
+      "id": "L2_08",
+      "level": 2,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 4,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "L2_09",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 6,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_10",
+      "level": 2,
+      "cost": {
+        "white": 4,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 3,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": "take_opponent_gem"
+    },
+    {
+      "id": "L2_11",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 6,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 0,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L2_12",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 2,
+        "red": 5,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 2
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_13",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 5,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 2
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_14",
+      "level": 2,
+      "cost": {
+        "white": 3,
+        "black": 0,
+        "red": 4,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": "take_opponent_gem"
+    },
+    {
+      "id": "L2_15",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 2,
+        "red": 2,
+        "blue": 0,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 2,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L2_16",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 3,
+        "blue": 4,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": "take_opponent_gem"
+    },
+    {
+      "id": "L2_17",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 4,
+        "blue": 0,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "L2_18",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 2,
+        "blue": 0,
+        "green": 5,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 2
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_19",
+      "level": 2,
+      "cost": {
+        "white": 4,
+        "black": 2,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "L2_20",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 4,
+        "red": 0,
+        "blue": 3,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": "take_opponent_gem"
+    },
+    {
+      "id": "L2_21",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 6,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 0,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L2_22",
+      "level": 2,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 2,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 2,
+      "crowns": 1,
+      "ability": null
+    },
+    {
+      "id": "L2_23",
+      "level": 2,
+      "cost": {
+        "white": 0,
+        "black": 4,
+        "red": 2,
+        "blue": 0,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 2,
+      "crowns": 0,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "L2_24",
+      "level": 2,
+      "cost": {
+        "white": 5,
+        "black": 0,
+        "red": 0,
+        "blue": 2,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 2
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L2_25",
+      "level": 2,
+      "cost": {
+        "white": 2,
+        "black": 5,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 2
+      },
+      "points": 1,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_01",
+      "level": 3,
+      "cost": {
+        "white": 2,
+        "black": 0,
+        "red": 0,
+        "blue": 6,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 4,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_02",
+      "level": 3,
+      "cost": {
+        "white": 3,
+        "black": 5,
+        "red": 0,
+        "blue": 0,
+        "green": 3,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "blue": 1
+      },
+      "points": 3,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L3_03",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 2,
+        "red": 6,
+        "blue": 0,
+        "green": 2,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 4,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_04",
+      "level": 3,
+      "cost": {
+        "white": 8,
+        "black": 0,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": null,
+      "points": 6,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_05",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 8,
+        "red": 0,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 0,
+      "crowns": 3,
+      "ability": null
+    },
+    {
+      "id": "L3_06",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 8,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "wildcard": 1
+      },
+      "points": 3,
+      "crowns": 0,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "L3_07",
+      "level": 3,
+      "cost": {
+        "white": 5,
+        "black": 0,
+        "red": 3,
+        "blue": 3,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 3,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L3_08",
+      "level": 3,
+      "cost": {
+        "white": 3,
+        "black": 0,
+        "red": 3,
+        "blue": 0,
+        "green": 5,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 3,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L3_09",
+      "level": 3,
+      "cost": {
+        "white": 2,
+        "black": 6,
+        "red": 2,
+        "blue": 0,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "black": 1
+      },
+      "points": 4,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_10",
+      "level": 3,
+      "cost": {
+        "white": 6,
+        "black": 2,
+        "red": 0,
+        "blue": 2,
+        "green": 0,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 4,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_11",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 0,
+        "red": 2,
+        "blue": 2,
+        "green": 6,
+        "pearl": 0,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "green": 1
+      },
+      "points": 4,
+      "crowns": 0,
+      "ability": null
+    },
+    {
+      "id": "L3_12",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 3,
+        "red": 0,
+        "blue": 5,
+        "green": 3,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "red": 1
+      },
+      "points": 3,
+      "crowns": 2,
+      "ability": null
+    },
+    {
+      "id": "L3_13",
+      "level": 3,
+      "cost": {
+        "white": 0,
+        "black": 3,
+        "red": 5,
+        "blue": 3,
+        "green": 0,
+        "pearl": 1,
+        "gold": 0
+      },
+      "gem_bonus": {
+        "white": 1
+      },
+      "points": 3,
+      "crowns": 2,
+      "ability": null
+    }
+  ],
+  "royal_cards": [
+    {
+      "id": "R_01",
+      "type": "royal",
+      "points": 2,
+      "ability": "take_scroll"
+    },
+    {
+      "id": "R_02",
+      "type": "royal",
+      "points": 2,
+      "ability": "extra_turn"
+    },
+    {
+      "id": "R_03",
+      "type": "royal",
+      "points": 3,
+      "ability": null
+    },
+    {
+      "id": "R_04",
+      "type": "royal",
+      "points": 2,
+      "ability": "take_opponent_gem"
+    }
+  ]
+}
