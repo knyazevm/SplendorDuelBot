@@ -287,6 +287,7 @@ function render() {
     goldClickable: hasReserveActions && st.phase === 'MAIN' && !busy,
     goldSelected: reserveMode,
     onCellClick,
+    useImages,
   });
 
   // Board meta
@@ -368,6 +369,7 @@ function renderRoyalsSection(st) {
     h += renderRoyal(r, {
       onclick: canChoose ? `window._chooseRoyal(${idx})` : '',
       extraClass: canChoose ? 'clickable' : '',
+      useImage: useImages,
     });
   });
   if (!st.royal_cards.length) h = '<span class="empty-hint">—</span>';

@@ -82,7 +82,10 @@ function renderCardImage(card, { onclick = '', extraClass = '' } = {}) {
 /**
  * Render a royal card.
  */
-export function renderRoyal(royal, { onclick = '', extraClass = '' } = {}) {
+export function renderRoyal(royal, { onclick = '', extraClass = '', useImage = false } = {}) {
+  if (useImage) {
+    return renderRoyalImage(royal, { onclick, extraClass });
+  }
   const abil = royal.ability
     ? `<div class="royal-abil">${ABILITY_ICON[royal.ability] || royal.ability}</div>`
     : '';
@@ -91,6 +94,18 @@ export function renderRoyal(royal, { onclick = '', extraClass = '' } = {}) {
     <div class="royal-pts">${royal.points}</div>
     ${abil}
     <div style="font-size:9px;color:var(--text2)">${royal.id}</div>
+  </div>`;
+}
+
+function renderRoyalImage(royal, { onclick = '', extraClass = '' } = {}) {
+  const src = `${IMAGES_BASE}/cards/${royal.id}.png`;
+  const fbId = 'fb_' + royal.id.replace(/[^a-zA-Z0-9]/g, '_');
+  const attr = onclick ? `onclick="${onclick}"` : '';
+  const fallback = renderRoyal(royal, { onclick, extraClass, useImage: false });
+  return `<div class="royal-img-wrap ${extraClass}" ${attr} title="${royal.id}">
+    <img class="royal-img" src="${src}" alt="${royal.id}"
+         onerror="this.parentElement.outerHTML=document.getElementById('${fbId}').innerHTML">
+    <template id="${fbId}">${fallback}</template>
   </div>`;
 }
 

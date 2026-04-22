@@ -1,19 +1,9 @@
 // board.js — 5×5 game board rendering
 
-import { GEM_CSS, GEM_CHARS } from './constants.js';
+import { GEM_CSS, GEM_CHARS, gemImageUrl } from './constants.js';
 
 /**
  * Render the 5×5 board into a container element.
- *
- * @param {HTMLElement} el - container
- * @param {number[][]} board - 5×5 grid of gem indices (-1 = empty)
- * @param {object} opts
- *   validCells: Set of "r,c" strings that are clickable
- *   selectedCell: {r,c} or null
- *   hintCells: Set of "r,c" to highlight as hint
- *   goldClickable: boolean — can gold cells be clicked
- *   goldSelected: boolean — is gold currently selected (reserve mode)
- *   onCellClick: function(r, c)
  */
 export function renderBoard(el, board, opts = {}) {
   const {
@@ -23,6 +13,7 @@ export function renderBoard(el, board, opts = {}) {
     goldClickable = false,
     goldSelected = false,
     onCellClick = null,
+    useImages = false,
   } = opts;
 
   el.innerHTML = '';
@@ -36,7 +27,16 @@ export function renderBoard(el, board, opts = {}) {
         cell.classList.add('empty');
       } else {
         cell.classList.add('filled', GEM_CSS[v]);
-        cell.textContent = GEM_CHARS[v];
+        if (useImages) {
+          const img = document.createElement('img');
+          img.src = gemImageUrl(v);
+          img.className = 'cell-gem-img';
+          img.alt = GEM_CHARS[v];
+          img.onerror = () => { img.remove(); cell.textContent = GEM_CHARS[v]; };
+          cell.appendChild(img);
+        } else {
+          cell.textContent = GEM_CHARS[v];
+        }
 
         if (v === 6) {
           // Gold cell

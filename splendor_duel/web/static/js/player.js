@@ -1,6 +1,6 @@
 // player.js — Player panel rendering
 
-import { GEM_NAMES, GEM_CSS, GEM_CHARS } from './constants.js';
+import { GEM_NAMES, GEM_CSS, GEM_CHARS, gemImageUrl } from './constants.js';
 import { renderCard, renderMiniCard } from './cards.js';
 
 /**
@@ -44,6 +44,8 @@ export function renderPlayer(el, player, opts = {}) {
     <div class="stat">⚜ <b>${player.scrolls}</b></div>
   </div>`;
 
+  const imgMode = opts.useImages;
+
   // Tokens
   h += `<div class="sec-label">Tokens (${player.total_tokens}/10)</div><div class="tokens-row">`;
   let hasTokens = false;
@@ -54,10 +56,10 @@ export function renderPlayer(el, player, opts = {}) {
       const clickable = canDiscard(i);
       const cls = clickable ? 'tok clickable' : 'tok';
       const click = clickable && onDiscard ? `onclick="window._onDiscard(${i})"` : '';
-      h += `<div class="${cls}" ${click}>
-        <div class="tok-dot ${GEM_CSS[i]}">${GEM_CHARS[i]}</div>
-        <span class="tok-n">×${v}</span>
-      </div>`;
+      const dot = imgMode
+        ? `<img class="tok-gem-img" src="${gemImageUrl(i)}" alt="${GEM_CHARS[i]}">`
+        : `<div class="tok-dot ${GEM_CSS[i]}">${GEM_CHARS[i]}</div>`;
+      h += `<div class="${cls}" ${click}>${dot}<span class="tok-n">×${v}</span></div>`;
     }
   }
   if (!hasTokens) h += '<span class="empty-hint">—</span>';
@@ -70,7 +72,10 @@ export function renderPlayer(el, player, opts = {}) {
     const v = player.bonuses[GEM_NAMES[i]] || 0;
     if (v > 0) {
       hasBonuses = true;
-      h += `<div class="tok"><div class="tok-dot ${GEM_CSS[i]}">${v}</div></div>`;
+      const dot = imgMode
+        ? `<img class="tok-gem-img" src="${gemImageUrl(i)}" alt="${GEM_CHARS[i]}">`
+        : `<div class="tok-dot ${GEM_CSS[i]}">${v}</div>`;
+      h += `<div class="tok">${dot}<span class="tok-n">${v}</span></div>`;
     }
   }
   if (!hasBonuses) h += '<span class="empty-hint">—</span>';

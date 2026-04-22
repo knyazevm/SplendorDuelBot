@@ -12,3 +12,7 @@ export const ABILITY_ICON = {
 };
 
 export const IMAGES_BASE = '/static/images';
+
+export function gemImageUrl(gemIndex) {
+  return `${IMAGES_BASE}/gems/gem_${GEM_NAMES[gemIndex]}.png`;
+}
