@@ -141,3 +141,20 @@ pytest tests/ --cov=splendor_duel --cov-report=term-missing
 - **Numpy board** — 5×5 `int8` array; legal line generation uses vectorised indexing over pre-computed segments.
 - **Observation modes** — full-information and partial-information (hidden reserves) both supported; set via env config.
 - **Phase-based turns** — turn split into `OPTIONAL → MAIN → EFFECT → DISCARD` phases; each has its own `get_legal_actions()`.
+
+## Использование среды Gymnasium
+```
+from splendor_duel.env import SplendorDuelEnv
+
+# Против Greedy
+env = SplendorDuelEnv(opponent="greedy")
+obs, info = env.reset(seed=42)
+mask = info["legal_mask"]  # bool[265]
+
+# Выбрать действие (только где mask==True)
+action = np.random.choice(np.where(mask)[0])
+obs, reward, done, truncated, info = env.step(action)
+
+# Self-play (для AlphaZero)
+env = SplendorDuelEnv(opponent="self")
+```

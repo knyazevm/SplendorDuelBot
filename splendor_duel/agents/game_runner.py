@@ -91,6 +91,8 @@ def play_game(
         state = GameEngine.apply_action(state, action)
         steps += 1
 
+        print(f"  T{state.turn} | scores {state.players[0].points}-{state.players[1].points} | crowns {state.players[0].crowns}-{state.players[1].crowns}")
+
     elapsed = time.time() - t0
 
     agent0.notify_game_end(state)
