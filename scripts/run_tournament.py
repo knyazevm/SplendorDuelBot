@@ -105,9 +105,11 @@ def main():
     parser.add_argument("--games", type=int, default=20,
                         help="Games per matchup (default: 20)")
     parser.add_argument("--include-mcts", action="store_true",
-                        help="Include MCTS agent (slower)")
+                        help="Include MCTS agents")
     parser.add_argument("--mcts-iters", type=int, default=200,
-                        help="MCTS iterations per move (default: 200)")
+                        help="MCTS iterations (default: 200)")
+    parser.add_argument("--mcts-modes", type=str, default="none,greedy,random",
+                        help="Comma-separated rollout modes (default: none,greedy,random)")
     parser.add_argument("--seed", type=int, default=42,
                         help="Base random seed")
     args = parser.parse_args()
@@ -121,7 +123,13 @@ def main():
     }
     if args.include_mcts:
         iters = args.mcts_iters
-        agents[f"MCTS({iters})"] = lambda: MCTSAgent(iterations=iters)
+        for mode in args.mcts_modes.split(','):
+            mode = mode.strip()
+            tag = f"MCTS({iters},{mode})"
+            # Capture mode in closure
+            agents[tag] = (lambda m: lambda: MCTSAgent(
+                iterations=iters, rollout=m, prioritize=True
+            ))(mode)
 
     names = list(agents.keys())
     all_results: dict[tuple[str, str], list[GameResult]] = {}

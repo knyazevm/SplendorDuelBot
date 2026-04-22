@@ -73,11 +73,23 @@ python scripts/run_tournament.py --games 50 --seed 123
 MCTS значительно медленнее (каждая игра ~30–120 секунд в зависимости от `--mcts-iters`).
 
 ```bash
-# Лёгкий MCTS (50 итераций, ~5 мин на 10 игр)
-python scripts/run_tournament.py --games 10 --include-mcts --mcts-iters 50
+# Быстрый: Greedy vs MCTS(none) — ~5 мин на 20 игр
+python scripts/run_tournament.py --games 20 --include-mcts \
+  --mcts-modes none --mcts-iters 200
 
-# Средний MCTS (200 итераций, ~20 мин на 10 игр)  
-python scripts/run_tournament.py --games 10 --include-mcts --mcts-iters 200
+# Сравнение всех режимов — ~30 мин
+python scripts/run_tournament.py --games 20 --include-mcts \
+  --mcts-modes none,greedy,random --mcts-iters 100
+
+# Только MCTS(none) с разным бюджетом — запускай отдельно
+python scripts/run_tournament.py --games 20 --include-mcts \
+  --mcts-modes none --mcts-iters 100
+
+python scripts/run_tournament.py --games 20 --include-mcts \
+  --mcts-modes none --mcts-iters 400
+
+# Чисто Greedy vs Random (быстро, ~10 сек)
+python scripts/run_tournament.py --games 50
 ```
 
 ---

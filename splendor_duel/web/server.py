@@ -55,8 +55,8 @@ session = Session()
 AGENTS = {
     "Random": lambda: RandomAgent(),
     "Greedy": lambda: GreedyAgent(),
-    "MCTS_50": lambda: MCTSAgent(iterations=50, rollout_depth=40),
-    "MCTS_200": lambda: MCTSAgent(iterations=200, rollout_depth=40),
+    "MCTS_fast": lambda: MCTSAgent(iterations=200, rollout='none'),
+    "MCTS_greedy": lambda: MCTSAgent(iterations=100, rollout='greedy', rollout_depth=20),
 }
 
 
