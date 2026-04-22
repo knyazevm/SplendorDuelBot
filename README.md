@@ -158,3 +158,24 @@ obs, reward, done, truncated, info = env.step(action)
 # Self-play (для AlphaZero)
 env = SplendorDuelEnv(opponent="self")
 ```
+
+## Обучение PPO
+
+```
+# 1. Быстрый тест (~5 мин): должен начать побеждать Random
+python scripts/train_ppo.py --opponent random --steps 50000 --device cuda
+
+# 2. Основное обучение vs Greedy (~1-2 часа на CPU)
+python scripts/train_ppo.py --opponent greedy --steps 500000
+
+# 3. С GPU (если есть)
+python scripts/train_ppo.py --opponent greedy --steps 500000 --device cuda
+
+# 4. Оценка обученной модели
+python scripts/train_ppo.py --eval checkpoints/ppo_final.pt --eval-games 50
+
+# 5. Дообучение с чекпоинта
+python scripts/train_ppo.py --resume checkpoints/ppo_250.pt --steps 1000000
+
+# 6. Играть в web-интерфейсе — добавь PPOAgent в server.py AGENTS
+```
