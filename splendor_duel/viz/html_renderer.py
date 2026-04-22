@@ -18,17 +18,17 @@ from .replay import GameLog, log_to_json_data
 
 
 def render_html(
-    log: GameLog,
-    output_path: str,
-    images_dir: Optional[str] = None,
+        log: GameLog,
+        output_path: str,
+        images_dir: Optional[str] = None,
 ) -> None:
-    steps_data  = log_to_json_data(log)
-    steps_json  = json.dumps(steps_data, ensure_ascii=False)
-    use_images  = json.dumps(images_dir is not None)
+    steps_data = log_to_json_data(log)
+    steps_json = json.dumps(steps_data, ensure_ascii=False)
+    use_images = json.dumps(images_dir is not None)
     images_base = json.dumps(images_dir or '')
 
     html = _TEMPLATE
-    html = html.replace('/*STEPS*/',      steps_json)
+    html = html.replace('/*STEPS*/', steps_json)
     html = html.replace('/*USE_IMAGES*/', use_images)
     html = html.replace('/*IMAGES_DIR*/', images_base)
 
@@ -221,10 +221,15 @@ function renderCardColumns(player){
     // cols[key] = { cards: [html,...], points: number }
     const cols={};
 
+    // wildcard_assignments: {card_id -> gem_index} from server
+    const wca = player.wildcard_assignments || {};
     for(const c of player.cards){
         let key='none';
-        if(c.is_wildcard){ key='wc'; }
-        else if(c.gem_bonus){
+        if(c.is_wildcard){
+            // Place wildcard in the column of its assigned colour if known
+            const assigned = wca[c.id];
+            key = (assigned !== undefined) ? assigned : 'wc';
+        } else if(c.gem_bonus){
             for(let i=0;i<7;i++){if((c.gem_bonus[GN[i]]||0)>0){key=i;break;}}
         }
         if(!cols[key])cols[key]={cards:[],points:0};

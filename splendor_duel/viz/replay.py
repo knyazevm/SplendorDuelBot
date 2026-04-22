@@ -213,6 +213,7 @@ def _player_to_dict(p: PlayerState) -> dict:
         'reserved': [_card_to_dict(c) for c in p.reserved],
         'royals': [_royal_to_dict(r) for r in p.royals],
         'total_tokens': int(p.total_tokens),
+        'wildcard_assignments': {card_id: int(gem_idx) for card_id, gem_idx in p.wildcard_assignments.items()},
     }
 
 
