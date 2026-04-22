@@ -374,20 +374,29 @@ def _apply_choose_royal(s: GameState, action: ChooseRoyal) -> GameState:
     royal = s.royal_cards.pop(action.index)
     s.active.add_royal(royal)
 
+    # Check if another royal needed first (e.g. jumped 2→6 crowns)
+    if s.active.needs_royal() and s.royal_cards:
+        s.phase = Phase.ROYAL
+        return s
+
     # Apply royal card ability
     if royal.ability == ABILITY_TAKE_SCROLL:
         s.give_scroll_to(s.current_player)
-    elif royal.ability == ABILITY_EXTRA_TURN:
-        s.extra_turn_flag = True
-    elif royal.ability == ABILITY_TAKE_SAME_GEM:
-        # Royal cards can have take_same_gem? Unlikely but handle gracefully
-        pass
-    elif royal.ability == ABILITY_TAKE_OPPONENT_GEM:
-        pass
+        return _advance_after_royal(s)
 
-    # After royal → check if another royal is needed (e.g. jumped from 2 to 6 crowns)
-    if s.active.needs_royal() and s.royal_cards:
-        s.phase = Phase.ROYAL
+    if royal.ability == ABILITY_EXTRA_TURN:
+        s.extra_turn_flag = True
+        return _advance_after_royal(s)
+
+    if royal.ability in (ABILITY_TAKE_SAME_GEM, ABILITY_TAKE_OPPONENT_GEM):
+        # Need player input — enter EFFECT phase
+        s.pending_effect = royal.ability
+        s.pending_card = None
+        s.phase = Phase.EFFECT
+        effect_actions = _get_effect_actions(s)
+        if len(effect_actions) == 1 and isinstance(effect_actions[0], EffectSkip):
+            s.pending_effect = None
+            return _advance_after_royal(s)
         return s
 
     return _advance_after_royal(s)

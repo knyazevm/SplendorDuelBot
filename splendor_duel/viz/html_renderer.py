@@ -1,10 +1,15 @@
 """
 html_renderer.py — Generate a standalone HTML replay of a game.
 
+Two rendering modes:
+  Digital (default): Cards drawn with CSS — points, crowns, gem bonus, cost, ability.
+  Image:             Card photos from images/cards/ directory.
+
 Usage:
     from splendor_duel.viz.html_renderer import render_html
-    render_html(game_log, "replay.html")
-    # open replay.html in browser — step through with arrow keys
+
+    render_html(log, "replay.html")                          # digital
+    render_html(log, "replay.html", images_dir="../images")  # with photos
 """
 from __future__ import annotations
 
@@ -17,27 +22,27 @@ from .replay import GameLog, log_to_json_data
 
 def render_html(
         log: GameLog,
-        output_path: str = "replay.html",
-        title: str = "Splendor Duel Replay",
-) -> str:
+        output_path: str,
+        images_dir: Optional[str] = None,
+) -> None:
     """
-    Generate a self-contained HTML file with a visual game replay.
+    Write a self-contained HTML replay file.
 
-    Returns the output file path.
+    Args:
+        log:         Recorded GameLog.
+        output_path: Where to save the HTML file.
+        images_dir:  Relative path to images/ directory (enables photo mode).
+                     If None, uses digital card rendering.
     """
     steps_json = json.dumps(log_to_json_data(log), ensure_ascii=False)
+    use_images = images_dir is not None
+    images_dir_js = json.dumps(images_dir or '')
 
-    winner = log.winner
-    winner_text = f"Player {winner} wins!" if winner is not None else "Game in progress"
-    n_steps = log.n_steps
-
-    html = _HTML_TEMPLATE.replace('__STEPS_JSON__', steps_json)
-    html = html.replace('__TITLE__', title)
-    html = html.replace('__WINNER__', winner_text)
-    html = html.replace('__N_STEPS__', str(n_steps))
+    html = _HTML_TEMPLATE.replace('__STEPS_DATA__', steps_json)
+    html = html.replace('__USE_IMAGES__', json.dumps(use_images))
+    html = html.replace('__IMAGES_DIR__', images_dir_js)
 
     Path(output_path).write_text(html, encoding='utf-8')
-    return output_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -47,267 +52,347 @@ _HTML_TEMPLATE = r'''<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>__TITLE__</title>
+<title>Splendor Duel — Game Replay</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
-.app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+       background: #1a1a2e; color: #e0e0e0; min-height: 100vh; padding: 16px; }
 
-/* Header */
-.header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #16213e; border-radius: 12px; margin-bottom: 12px; }
-.header h1 { font-size: 18px; font-weight: 600; color: #e8b84b; }
-.turn-info { font-size: 14px; color: #a0a0b8; }
-.phase-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #0f3460; color: #53a8ff; }
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 
-/* Main grid */
-.main-grid { display: grid; grid-template-columns: 1fr 280px 1fr; gap: 12px; margin-bottom: 12px; }
+.header { display: flex; align-items: center; justify-content: space-between;
+          background: #16213e; border-radius: 10px; padding: 12px 20px; }
+.header-left { display: flex; flex-direction: column; gap: 2px; }
+.turn-info { font-size: 18px; font-weight: 600; }
+.action-desc { font-size: 13px; color: #8899aa; min-height: 18px; }
+.nav { display: flex; align-items: center; gap: 10px; }
+.nav button { background: #0f3460; border: none; color: #e0e0e0; padding: 8px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; }
+.nav button:hover { background: #1a5276; }
+.step-counter { font-size: 13px; color: #8899aa; min-width: 80px; text-align: center; }
 
-/* Player panel */
-.player-panel { background: #16213e; border-radius: 12px; padding: 14px; border: 2px solid transparent; }
-.player-panel.active { border-color: #e8b84b; }
-.player-name { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
-.player-name .star { color: #e8b84b; }
-.stat-row { display: flex; gap: 16px; margin-bottom: 6px; font-size: 13px; }
-.stat-label { color: #888; }
-.stat-val { font-weight: 600; }
-.token-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
-.token-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-.scroll-icon { color: #e8b84b; font-size: 16px; }
-.card-count { font-size: 12px; color: #888; margin-top: 6px; }
-.card-list { font-size: 11px; color: #aaa; margin-top: 4px; line-height: 1.5; max-height: 120px; overflow-y: auto; }
-.royal-badge { display: inline-block; padding: 2px 8px; background: #4a1942; color: #d946ef; border-radius: 6px; font-size: 11px; margin: 2px; }
+.main-area { display: grid; grid-template-columns: auto 1fr; gap: 12px; }
 
-/* Board */
-.board-wrap { background: #16213e; border-radius: 12px; padding: 14px; text-align: center; }
-.board-title { font-size: 13px; color: #888; margin-bottom: 8px; }
-.board-grid { display: inline-grid; grid-template-columns: repeat(5, 48px); gap: 4px; }
-.cell { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; border: 2px solid transparent; }
-.cell.empty { background: #252540; border: 1px dashed #333; }
-.cell-white { background: #d4d4c8; color: #333; border-color: #aaa; }
-.cell-black { background: #333; color: #ccc; border-color: #555; }
-.cell-red { background: #c0392b; color: #fff; border-color: #e74c3c; }
-.cell-blue { background: #2c6fbb; color: #fff; border-color: #3d8bfd; }
-.cell-green { background: #27ae60; color: #fff; border-color: #2ecc71; }
-.cell-pearl { background: #7ec8e3; color: #1a1a2e; border-color: #a8d8ea; }
-.cell-gold { background: #d4a017; color: #1a1a2e; border-color: #f1c40f; }
-.board-meta { margin-top: 10px; font-size: 12px; color: #888; }
-.scrolls-display { display: inline-flex; gap: 4px; }
-.scroll-pip { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
-.scroll-pip.on { background: #e8b84b; }
-.scroll-pip.off { background: #333; border: 1px solid #555; }
+/* ── Board ─────────────────────────────────────────────────────────────── */
+.board-panel { background: #16213e; border-radius: 10px; padding: 16px; }
+.board-grid { display: grid; grid-template-columns: repeat(5, 48px); gap: 4px; }
+.board-cell { width: 48px; height: 48px; border-radius: 50%; display: flex;
+              align-items: center; justify-content: center; font-weight: 700;
+              font-size: 16px; border: 2px solid transparent; transition: all 0.15s; }
+.board-cell.empty { background: #2a2a40; border: 2px dashed #3a3a50; }
 
-/* Pyramid */
-.pyramid-wrap { background: #16213e; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
-.pyramid-title { font-size: 13px; color: #888; margin-bottom: 8px; }
+.side-info { margin-top: 14px; font-size: 13px; color: #8899aa; }
+.side-info .label { color: #667; }
+.scrolls-display { margin-top: 6px; font-size: 18px; letter-spacing: 4px; }
+
+/* ── Pyramid ───────────────────────────────────────────────────────────── */
+.right-panel { display: flex; flex-direction: column; gap: 12px; }
+.pyramid-panel { background: #16213e; border-radius: 10px; padding: 14px; }
+.pyramid-panel h3 { font-size: 13px; color: #667; margin-bottom: 8px; text-transform: uppercase;
+                    letter-spacing: 1px; }
 .pyramid-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.level-label { width: 24px; font-size: 12px; font-weight: 600; text-align: center; padding: 2px 4px; border-radius: 4px; }
-.level-1 { background: #1b4332; color: #52b788; }
-.level-2 { background: #5c4b17; color: #e8b84b; }
-.level-3 { background: #1b2a5c; color: #6ea8fe; }
-.card-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #252540; border-radius: 6px; font-size: 11px; border: 1px solid #333; cursor: default; position: relative; }
-.card-chip:hover { border-color: #666; background: #2a2a50; }
-.card-chip .pts { font-weight: 700; color: #e8b84b; }
-.card-chip .cr { color: #d946ef; }
-.card-chip .bon { font-weight: 600; }
-.card-chip .eff { color: #53a8ff; }
-.deck-count { font-size: 11px; color: #555; margin-left: 4px; }
+.pyramid-label { font-size: 11px; color: #667; width: 24px; text-align: right; margin-right: 4px; }
 
-/* Royals row */
-.royals-wrap { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.royals-label { font-size: 13px; color: #888; }
-.royal-chip { padding: 6px 12px; background: #2a1a3e; border: 1px solid #5a3d7a; border-radius: 8px; font-size: 12px; color: #d4a0ff; }
+/* ── Royal cards ───────────────────────────────────────────────────────── */
+.royals-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* Navigation */
-.nav { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #16213e; border-radius: 12px; }
-.nav button { padding: 8px 18px; border: 1px solid #333; background: #252540; color: #ddd; border-radius: 8px; cursor: pointer; font-size: 13px; }
-.nav button:hover { background: #333; }
-.nav button:active { transform: scale(0.97); }
-.nav button.primary { background: #0f3460; border-color: #1a5276; color: #53a8ff; }
-.progress-wrap { flex: 1; }
-.progress-bar { height: 4px; background: #252540; border-radius: 2px; overflow: hidden; }
-.progress-fill { height: 100%; background: #e8b84b; transition: width 0.15s; }
-.step-text { font-size: 12px; color: #888; margin-top: 4px; }
-.action-desc { font-size: 13px; color: #e8b84b; margin-top: 8px; padding: 8px 12px; background: #1a1a2e; border-left: 3px solid #e8b84b; border-radius: 0 6px 6px 0; }
-.winner-banner { text-align: center; padding: 16px; background: linear-gradient(135deg, #1b4332, #16213e); border-radius: 12px; margin-top: 12px; font-size: 18px; font-weight: 600; color: #52b788; }
+/* ── Players ───────────────────────────────────────────────────────────── */
+.players-area { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.player-panel { background: #16213e; border-radius: 10px; padding: 14px; }
+.player-panel.active { border: 2px solid #e9b44c; }
+.player-panel.inactive { border: 2px solid transparent; }
+.player-header { display: flex; justify-content: space-between; align-items: center;
+                 margin-bottom: 10px; }
+.player-name { font-size: 15px; font-weight: 600; }
+.player-name .star { color: #e9b44c; }
+.player-stats { display: flex; gap: 16px; font-size: 13px; }
+.stat { display: flex; align-items: center; gap: 4px; }
+.stat-val { font-weight: 600; font-size: 15px; }
+
+.tokens-row { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.token-badge { display: flex; align-items: center; gap: 3px; background: #1a1a30;
+               border-radius: 14px; padding: 3px 8px 3px 4px; }
+.token-dot { width: 18px; height: 18px; border-radius: 50%; display: flex;
+             align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.token-count { font-size: 12px; font-weight: 600; }
+
+.section-label { font-size: 11px; color: #556; text-transform: uppercase;
+                 letter-spacing: 1px; margin: 8px 0 4px; }
+.cards-grid { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* ── Gem colors ────────────────────────────────────────────────────────── */
+.gem-white  { background: #e8e0d0; color: #333; }
+.gem-black  { background: #3a3a3a; color: #fff; }
+.gem-red    { background: #d44040; color: #fff; }
+.gem-blue   { background: #4080d0; color: #fff; }
+.gem-green  { background: #40a060; color: #fff; }
+.gem-pearl  { background: #b0d0e8; color: #334; }
+.gem-gold   { background: #d4a020; color: #333; }
+
+/* ── Card (digital mode) ──────────────────────────────────────────────── */
+.card { width: 88px; min-height: 110px; border-radius: 6px; padding: 5px 6px;
+        display: flex; flex-direction: column; position: relative;
+        border: 2px solid; font-size: 11px; cursor: default; flex-shrink: 0; }
+.card:hover { transform: scale(1.08); z-index: 10; transition: transform 0.1s; }
+
+.card-l1 { background: #1b3a25; border-color: #3a7a4a; }
+.card-l2 { background: #3a3218; border-color: #9a8030; }
+.card-l3 { background: #1a2a42; border-color: #3a6aa0; }
+.card-royal { background: #2a1a3a; border-color: #7a4a9a; width: 80px; min-height: 64px; }
+
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card-points { font-size: 18px; font-weight: 700; min-width: 16px; }
+.card-points.zero { visibility: hidden; }
+.card-crowns { font-size: 12px; color: #e9b44c; letter-spacing: 1px; flex-shrink: 0; }
+.card-bonus-area { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.gem-circle { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.3); }
+.gem-circle.wildcard { background: linear-gradient(135deg, #d44040, #4080d0, #40a060, #e8e0d0);
+                       border-color: rgba(255,255,255,0.5); }
+
+.card-ability { font-size: 10px; margin-top: 2px; color: #aab; }
+.card-cost { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+.cost-pip { display: flex; align-items: center; gap: 3px; }
+.cost-dot { width: 16px; height: 16px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-size: 9px; font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.2); }
+
+/* ── Card (image mode) ─────────────────────────────────────────────────── */
+.card-img-wrap { flex-shrink: 0; position: relative; }
+.card-img { width: 88px; height: 120px; border-radius: 6px; object-fit: cover;
+            border: 2px solid #444; cursor: default; display: block; }
+.card-img-wrap:hover { transform: scale(1.5); z-index: 10; transition: transform 0.15s; }
+
+/* ── Royal card ────────────────────────────────────────────────────────── */
+.royal-pts { font-size: 16px; font-weight: 700; }
+.royal-ability { font-size: 9px; color: #aab; margin-top: 2px; }
+
+/* ── Winner banner ─────────────────────────────────────────────────────── */
+.winner-banner { background: #e9b44c; color: #1a1a2e; text-align: center;
+                 padding: 12px; border-radius: 10px; font-size: 18px; font-weight: 700; }
+
+/* ── Keyboard hint ─────────────────────────────────────────────────────── */
+.hint { text-align: center; font-size: 11px; color: #445; margin-top: 4px; }
 </style>
 </head>
 <body>
-<div class="app" id="app">
-  <div class="header">
-    <h1>__TITLE__</h1>
-    <div class="turn-info" id="turnInfo"></div>
-  </div>
-  <div class="main-grid">
-    <div class="player-panel" id="panel0"></div>
-    <div class="board-wrap" id="boardWrap"></div>
-    <div class="player-panel" id="panel1"></div>
-  </div>
-  <div class="pyramid-wrap" id="pyramidWrap"></div>
-  <div class="royals-wrap" id="royalsWrap"></div>
-  <div class="nav" id="nav">
-    <button onclick="goTo(0)">⏮</button>
-    <button onclick="step(-1)">◀ Prev</button>
-    <div class="progress-wrap">
-      <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
-      <div class="step-text" id="stepText"></div>
-    </div>
-    <button onclick="step(1)">Next ▶</button>
-    <button onclick="goTo(steps.length-1)">⏭</button>
-    <button class="primary" id="playBtn" onclick="togglePlay()">▶ Play</button>
-  </div>
-  <div id="actionDesc" class="action-desc" style="display:none"></div>
-  <div id="winnerBanner" style="display:none"></div>
-</div>
+<div class="container" id="app"></div>
+<div class="hint">← → arrow keys to navigate · Home / End for first / last step</div>
 
 <script>
-const steps = __STEPS_JSON__;
-let cur = 0;
-let playing = false;
-let playTimer = null;
+const STEPS = __STEPS_DATA__;
+const USE_IMAGES = __USE_IMAGES__;
+const IMAGES_DIR = __IMAGES_DIR__;
+let current = 0;
 
 const GEM_NAMES = ['white','black','red','blue','green','pearl','gold'];
-const GEM_LETTERS = {white:'W',black:'K',red:'R',blue:'B',green:'G',pearl:'P',gold:'$'};
-const GEM_CSS = {white:'cell-white',black:'cell-black',red:'cell-red',blue:'cell-blue',green:'cell-green',pearl:'cell-pearl',gold:'cell-gold'};
-const BON_CSS = {white:'#d4d4c8',black:'#666',red:'#e74c3c',blue:'#3d8bfd',green:'#2ecc71',pearl:'#7ec8e3',gold:'#f1c40f'};
+const GEM_CSS   = ['gem-white','gem-black','gem-red','gem-blue','gem-green','gem-pearl','gem-gold'];
+const GEM_CHAR  = ['W','K','R','B','G','P','$'];
+const ABILITY_ICONS = {
+    'extra_turn':'\u21bb', 'take_same_gem':'\u25ce',
+    'take_scroll':'\ud83d\udcdc', 'take_opponent_gem':'\u21c4',
+};
+const PHASE_LABELS = {
+    'OPTIONAL':'Optional','MAIN':'Main','EFFECT':'Effect',
+    'ROYAL':'Royal','DISCARD':'Discard','GAME_OVER':'Game Over',
+};
 
-function render() {
-  const d = steps[cur];
-  const s = d.state;
+function gemCssClass(idx) { return idx >= 0 && idx < 7 ? GEM_CSS[idx] : ''; }
 
-  document.getElementById('turnInfo').innerHTML =
-    `Turn ${s.turn} &middot; <span class="phase-badge">${s.phase}</span>`;
+/* ── Card rendering ─────────────────────────────────────────────────────── */
 
-  renderBoard(s);
-  renderPlayer(0, s);
-  renderPlayer(1, s);
-  renderPyramid(s);
-  renderRoyals(s);
+function cardDigital(card) {
+    const lvl = card.level ? 'card-l'+card.level : 'card-royal';
+    const ptsClass = card.points ? '' : ' zero';
+    const pts = '<span class="card-points'+ptsClass+'">'+card.points+'</span>';
+    const crowns = card.crowns ? '<span class="card-crowns">'+ '\u265b'.repeat(card.crowns)+'</span>' : '';
 
-  const pct = steps.length > 1 ? (cur / (steps.length - 1) * 100) : 100;
-  document.getElementById('progFill').style.width = pct + '%';
-  document.getElementById('stepText').textContent = `Step ${cur} / ${steps.length - 1}`;
+    let bonusHtml = '';
+    if (card.is_wildcard) {
+        bonusHtml = '<div class="gem-circle wildcard"></div>';
+    } else if (card.gem_bonus) {
+        for (const nm of GEM_NAMES) {
+            const cnt = card.gem_bonus[nm] || 0;
+            if (cnt > 0) {
+                const idx = GEM_NAMES.indexOf(nm);
+                for (let j = 0; j < cnt; j++)
+                    bonusHtml += '<div class="gem-circle '+GEM_CSS[idx]+'"></div>';
+            }
+        }
+    }
 
-  const ad = document.getElementById('actionDesc');
-  if (d.description) { ad.style.display = 'block'; ad.textContent = `▸ ${d.description}`; }
-  else { ad.style.display = 'none'; }
+    const abilIcon = card.ability ? (ABILITY_ICONS[card.ability]||card.ability) : '';
+    const abilHtml = abilIcon ? '<div class="card-ability">'+abilIcon+'</div>' : '';
 
-  const wb = document.getElementById('winnerBanner');
-  if (s.phase === 'GAME_OVER') {
-    wb.style.display = 'block';
-    const w = s.players[0].points > s.players[1].points ? 0 : 1;
-    wb.textContent = `Player ${w} wins!`;
-    wb.className = 'winner-banner';
-  } else { wb.style.display = 'none'; }
+    let costHtml = '';
+    if (card.cost) {
+        for (let i = 0; i < 7; i++) {
+            const v = card.cost[GEM_NAMES[i]] || 0;
+            if (v > 0) costHtml += '<div class="cost-pip"><div class="cost-dot '+GEM_CSS[i]+'">'+v+'</div></div>';
+        }
+    }
+
+    return '<div class="card '+lvl+'" title="'+card.id+'">'
+        +'<div class="card-top">'+pts+crowns+'<div class="card-bonus-area">'+bonusHtml+'</div></div>'
+        +abilHtml
+        +'<div class="card-cost">'+costHtml+'</div></div>';
 }
 
-function renderBoard(s) {
-  let h = '<div class="board-title">Board</div><div class="board-grid">';
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-    const v = s.board[r][c];
-    if (v === -1) h += '<div class="cell empty"></div>';
-    else { const name = GEM_NAMES[v]; h += `<div class="cell ${GEM_CSS[name]}">${GEM_LETTERS[name]}</div>`; }
-  }
-  h += '</div><div class="board-meta"><span>Scrolls: </span><span class="scrolls-display">';
-  for (let i = 0; i < 3; i++) h += `<span class="scroll-pip ${i < s.scrolls_center ? 'on' : 'off'}"></span>`;
-  h += `</span> &middot; Bag: ${s.bag_total}</div>`;
-  document.getElementById('boardWrap').innerHTML = h;
+function cardImage(card) {
+    const src = IMAGES_DIR+'/cards/'+card.id+'.jpg';
+    const fallback = cardDigital(card).replace(/"/g,'&quot;');
+    return '<div class="card-img-wrap"><img class="card-img" src="'+src+'" alt="'+card.id+'" title="'+card.id+'"'
+        +' onerror="this.parentElement.outerHTML=\''+fallback.replace(/'/g,"\\'")+'\';"></div>';
 }
 
-function tokenPills(tokens) {
-  let h = '';
-  GEM_NAMES.forEach(name => {
-    const v = tokens[name] || 0;
-    if (v > 0) h += `<span class="token-pill" style="background:${BON_CSS[name]}33;color:${BON_CSS[name]}">${GEM_LETTERS[name]}:${v}</span>`;
-  });
-  return h;
+function renderCard(card) {
+    return USE_IMAGES ? cardImage(card) : cardDigital(card);
 }
 
-function renderPlayer(idx, s) {
-  const p = s.players[idx];
-  const active = s.current_player === idx;
-  const el = document.getElementById('panel' + idx);
-  el.className = 'player-panel' + (active ? ' active' : '');
+function renderRoyalCard(card) {
+    const abilIcon = card.ability ? (ABILITY_ICONS[card.ability]||card.ability) : '';
+    return '<div class="card card-royal" title="'+card.id+'">'
+        +'<div class="card-top"><span class="royal-pts">'+card.points+'</span></div>'
+        +(abilIcon ? '<div class="royal-ability">'+abilIcon+'</div>' : '')
+        +'</div>';
+}
 
-  let h = `<div class="player-name">Player ${idx}${active ? ' <span class="star">★</span>' : ''}</div>`;
-  h += `<div class="stat-row"><span class="stat-label">Points:</span> <span class="stat-val">${p.points}</span>`;
-  h += ` &nbsp; <span class="stat-label">Crowns:</span> <span class="stat-val">${p.crowns}</span></div>`;
-  h += `<div style="font-size:12px;color:#888;margin:4px 0">Tokens (${p.total_tokens})</div>`;
-  h += `<div class="token-row">${tokenPills(p.tokens)}</div>`;
-  h += `<div style="font-size:12px;color:#888;margin:4px 0">Bonuses</div>`;
-  h += `<div class="token-row">${tokenPills(p.bonuses)}</div>`;
-  h += `<div class="card-count">Scrolls: ${'⚜'.repeat(p.scrolls)} &middot; Cards: ${p.cards.length} &middot; Reserved: ${p.reserved.length}</div>`;
+/* ── Board ────────────────────────────────────────────────────────────── */
 
-  if (p.royals.length) {
-    h += '<div style="margin-top:4px">';
-    p.royals.forEach(r => { h += `<span class="royal-badge">${r.id} (${r.points}pts)</span>`; });
+function renderBoard(board) {
+    let h = '<div class="board-grid">';
+    for (let r = 0; r < 5; r++)
+        for (let c = 0; c < 5; c++) {
+            const v = board[r][c];
+            h += v < 0
+                ? '<div class="board-cell empty"></div>'
+                : '<div class="board-cell '+GEM_CSS[v]+'">'+GEM_CHAR[v]+'</div>';
+        }
+    return h+'</div>';
+}
+
+/* ── Tokens / bonuses ─────────────────────────────────────────────────── */
+
+function renderTokens(tokens) {
+    let h = '';
+    for (let i = 0; i < 7; i++) {
+        const v = tokens[GEM_NAMES[i]]||0;
+        if (v > 0) h += '<div class="token-badge"><div class="token-dot '+GEM_CSS[i]+'">'+GEM_CHAR[i]+'</div><span class="token-count">\u00d7'+v+'</span></div>';
+    }
+    return h || '<span style="color:#445;font-size:12px">none</span>';
+}
+
+function renderBonuses(bonuses) {
+    let h = '';
+    for (let i = 0; i < 7; i++) {
+        const v = bonuses[GEM_NAMES[i]]||0;
+        if (v > 0) h += '<div class="token-badge"><div class="token-dot '+GEM_CSS[i]+'" style="border:1.5px solid rgba(255,255,255,0.4)">'+v+'</div></div>';
+    }
+    return h || '<span style="color:#445;font-size:12px">\u2014</span>';
+}
+
+function renderScrolls(count, max) {
+    let s = '';
+    for (let i = 0; i < max; i++) s += i < count ? '\u269c' : '\u00b7';
+    return s;
+}
+
+/* ── Full step render ────────────────────────────────────────────────── */
+
+function renderStep(si) {
+    const step = STEPS[si], st = step.state;
+    const isOver = st.phase === 'GAME_OVER';
+    const desc = step.description || (si === 0 ? 'Game start' : '');
+    const ap = step.player_acted;
+    let h = '';
+
+    h += '<div class="header"><div class="header-left">'
+       + '<div class="turn-info">Turn '+st.turn+' \u00b7 Player '+st.current_player+' \u00b7 '+(PHASE_LABELS[st.phase]||st.phase)+'</div>'
+       + '<div class="action-desc">'+(ap!==undefined?'P'+ap+': ':'')+desc+'</div>'
+       + '</div><div class="nav">'
+       + '<button onclick="go(0)">\u23ee</button>'
+       + '<button onclick="go(current-1)">\u25c0</button>'
+       + '<span class="step-counter">'+si+' / '+(STEPS.length-1)+'</span>'
+       + '<button onclick="go(current+1)">\u25b6</button>'
+       + '<button onclick="go(STEPS.length-1)">\u23ed</button>'
+       + '</div></div>';
+
+    if (isOver) {
+        let winner = '?';
+        for (let i = 0; i < 2; i++) {
+            const p = st.players[i];
+            if (p.points >= 20 || p.crowns >= 10) { winner = i; break; }
+            const byCol = {};
+            for (const c of p.cards) {
+                if (c.is_wildcard) continue;
+                if (c.gem_bonus) for (const nm of GEM_NAMES) {
+                    if ((c.gem_bonus[nm]||0) > 0) { byCol[nm] = (byCol[nm]||0)+c.points; break; }
+                }
+            }
+            for (const pts of Object.values(byCol)) if (pts >= 10) { winner = i; break; }
+            if (winner !== '?') break;
+        }
+        h += '<div class="winner-banner">\ud83c\udfc6 Player '+winner+' wins!</div>';
+    }
+
+    h += '<div class="main-area"><div class="board-panel">'+renderBoard(st.board)
+       + '<div class="side-info"><div><span class="label">Scrolls:</span> <span class="scrolls-display">'+renderScrolls(st.scrolls_center,3)+'</span></div>'
+       + '<div style="margin-top:6px"><span class="label">Bag:</span> '+st.bag_total+' tokens</div></div></div>'
+       + '<div class="right-panel"><div class="pyramid-panel"><h3>Pyramid</h3>';
+
+    for (const lvl of ['3','2','1']) {
+        const cards = st.pyramid[lvl]||[], ds = st.deck_sizes[lvl]||0;
+        h += '<div class="pyramid-row"><span class="pyramid-label">L'+lvl+'</span>'
+           + cards.map(c=>renderCard(c)).join('')
+           + '<span style="font-size:10px;color:#556;margin-left:4px">('+ds+')</span></div>';
+    }
+
+    h += '<h3 style="margin-top:10px">Royal cards</h3><div class="royals-row">'
+       + (st.royal_cards.length ? st.royal_cards.map(r=>renderRoyalCard(r)).join('') : '<span style="color:#445;font-size:12px">none</span>')
+       + '</div></div></div></div>';
+
+    h += '<div class="players-area">';
+    for (let pi = 0; pi < 2; pi++) {
+        const p = st.players[pi], act = pi===st.current_player && !isOver;
+        h += '<div class="player-panel '+(act?'active':'inactive')+'">'
+           + '<div class="player-header"><span class="player-name">Player '+pi+(act?' <span class="star">\u2605</span>':'')+'</span>'
+           + '<div class="player-stats">'
+           + '<div class="stat">\ud83c\udfc5 <span class="stat-val">'+p.points+'</span></div>'
+           + '<div class="stat">\u265b <span class="stat-val">'+p.crowns+'</span></div>'
+           + '<div class="stat">\u269c <span class="stat-val">'+p.scrolls+'</span></div>'
+           + '</div></div>'
+           + '<div class="section-label">Tokens ('+p.total_tokens+'/10)</div>'
+           + '<div class="tokens-row">'+renderTokens(p.tokens)+'</div>'
+           + '<div class="section-label">Bonuses</div>'
+           + '<div class="tokens-row">'+renderBonuses(p.bonuses)+'</div>'
+           + '<div class="section-label">Cards ('+p.cards.length+')</div>'
+           + '<div class="cards-grid">'+p.cards.map(c=>renderCard(c)).join('')+'</div>';
+        if (p.reserved.length)
+            h += '<div class="section-label">Reserved ('+p.reserved.length+')</div>'
+               + '<div class="cards-grid">'+p.reserved.map(c=>renderCard(c)).join('')+'</div>';
+        if (p.royals.length)
+            h += '<div class="section-label">Royal cards</div>'
+               + '<div class="cards-grid">'+p.royals.map(r=>renderRoyalCard(r)).join('')+'</div>';
+        h += '</div>';
+    }
     h += '</div>';
-  }
 
-  if (p.cards.length) {
-    h += '<div class="card-list">';
-    p.cards.forEach(c => {
-      let bon = '';
-      if (c.is_wildcard) bon = '★';
-      else if (c.gem_bonus) { for (const[k,v] of Object.entries(c.gem_bonus)) if (v>0) bon = `<span style="color:${BON_CSS[k]}">${GEM_LETTERS[k].repeat(v)}</span>`; }
-      h += `<span style="margin-right:6px">${c.id}(${c.points}pt${bon})</span>`;
-    });
-    h += '</div>';
-  }
-
-  el.innerHTML = h;
+    document.getElementById('app').innerHTML = h;
 }
 
-function renderPyramid(s) {
-  let h = '<div class="pyramid-title">Pyramid</div>';
-  [3,2,1].forEach(lvl => {
-    const cards = s.pyramid[lvl] || [];
-    const deck = s.deck_sizes[lvl] || 0;
-    h += `<div class="pyramid-row"><span class="level-label level-${lvl}">L${lvl}</span>`;
-    cards.forEach(c => {
-      let bon = '';
-      if (c.is_wildcard) bon = '<span class="bon" style="color:#e8b84b">★</span>';
-      else if (c.gem_bonus) { for (const[k,v] of Object.entries(c.gem_bonus)) if (v>0) bon = `<span class="bon" style="color:${BON_CSS[k]}">${GEM_LETTERS[k].repeat(v)}</span>`; }
-      const costTotal = Object.values(c.cost).reduce((a,b)=>a+b,0);
-      const costStr = GEM_NAMES.filter(g=>c.cost[g]>0).map(g=>`<span style="color:${BON_CSS[g]}">${c.cost[g]}</span>`).join('+');
-      h += `<div class="card-chip" title="${c.id}: cost ${costTotal}">`;
-      h += `<span class="pts">${c.points}</span>${bon}`;
-      if (c.crowns) h += `<span class="cr">${'♛'.repeat(c.crowns)}</span>`;
-      if (c.ability) h += `<span class="eff">⚡</span>`;
-      h += `<span style="font-size:10px;color:#666">${costStr}</span>`;
-      h += '</div>';
-    });
-    h += `<span class="deck-count">(${deck})</span></div>`;
-  });
-  document.getElementById('pyramidWrap').innerHTML = h;
+function go(idx) {
+    current = Math.max(0, Math.min(STEPS.length-1, idx));
+    renderStep(current);
 }
 
-function renderRoyals(s) {
-  if (!s.royal_cards.length) { document.getElementById('royalsWrap').innerHTML = ''; return; }
-  let h = '<span class="royals-label">Royals:</span>';
-  s.royal_cards.forEach(r => {
-    h += `<span class="royal-chip">${r.id}: ${r.points}pts${r.ability ? ' ⚡' + r.ability : ''}</span>`;
-  });
-  document.getElementById('royalsWrap').innerHTML = h;
-}
-
-function step(dir) { goTo(cur + dir); }
-function goTo(i) { cur = Math.max(0, Math.min(steps.length - 1, i)); render(); }
-function togglePlay() {
-  playing = !playing;
-  document.getElementById('playBtn').textContent = playing ? '⏸ Pause' : '▶ Play';
-  if (playing) playTimer = setInterval(() => { if (cur < steps.length - 1) step(1); else togglePlay(); }, 400);
-  else clearInterval(playTimer);
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); step(1); }
-  if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
-  if (e.key === 'Home') goTo(0);
-  if (e.key === 'End') goTo(steps.length - 1);
+document.addEventListener('keydown', function(e) {
+    if (e.key==='ArrowRight'||e.key===' ') go(current+1);
+    else if (e.key==='ArrowLeft') go(current-1);
+    else if (e.key==='Home') go(0);
+    else if (e.key==='End') go(STEPS.length-1);
 });
 
-render();
+renderStep(0);
 </script>
 </body>
-</html>
-'''
+</html>'''
