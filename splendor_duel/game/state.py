@@ -98,11 +98,10 @@ class GameState:
         p0 = PlayerState()
         p1 = PlayerState()
 
-        # Random first player; second player gets 1 scroll
+        # Random first player; second player gets 1 scroll to compensate
         first = random.randint(0, 1)
         second = 1 - first
-        players = (p0, p1) if first == 0 else (p1, p0)
-        players[second].scrolls = 1
+        [p0, p1][second].scrolls = 1
 
         scrolls_center = MAX_SCROLLS - 1  # 1 given to second player
 

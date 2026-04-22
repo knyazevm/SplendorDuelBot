@@ -36,14 +36,14 @@ class PlayerState:
     )
 
     def __init__(self) -> None:
-        self.tokens:  np.ndarray        = np.zeros(N_GEMS, dtype=np.int8)
-        self.bonuses: np.ndarray        = np.zeros(N_GEMS, dtype=np.int8)
-        self.cards:   list[Card]        = []
-        self.reserved: list[Card]       = []
-        self.scrolls: int               = 0
-        self.crowns:  int               = 0
-        self.points:  int               = 0
-        self.royals:  list[RoyalCard]   = []
+        self.tokens: np.ndarray = np.zeros(N_GEMS, dtype=np.int8)
+        self.bonuses: np.ndarray = np.zeros(N_GEMS, dtype=np.int8)
+        self.cards: list[Card] = []
+        self.reserved: list[Card] = []
+        self.scrolls: int = 0
+        self.crowns: int = 0
+        self.points: int = 0
+        self.royals: list[RoyalCard] = []
         # card_id → assigned Gem index (for wildcard cards)
         self.wildcard_assignments: dict[str, int] = {}
 
@@ -51,14 +51,14 @@ class PlayerState:
 
     def copy(self) -> PlayerState:
         p = PlayerState.__new__(PlayerState)
-        p.tokens   = self.tokens.copy()
-        p.bonuses  = self.bonuses.copy()
-        p.cards    = list(self.cards)          # Cards are frozen — shallow OK
+        p.tokens = self.tokens.copy()
+        p.bonuses = self.bonuses.copy()
+        p.cards = list(self.cards)  # Cards are frozen — shallow OK
         p.reserved = list(self.reserved)
-        p.scrolls  = self.scrolls
-        p.crowns   = self.crowns
-        p.points   = self.points
-        p.royals   = list(self.royals)
+        p.scrolls = self.scrolls
+        p.crowns = self.crowns
+        p.points = self.points
+        p.royals = list(self.royals)
         p.wildcard_assignments = dict(self.wildcard_assignments)
         return p
 
@@ -82,10 +82,16 @@ class PlayerState:
 
     # ── Card / bonus helpers ──────────────────────────────────────────────────
 
-    def add_card(self, card: Card, wildcard_color: Optional[int] = None) -> None:
+    def add_card(
+            self,
+            card: Card,
+            wildcard_color: Optional[int] = None,
+            wildcard_count: int = 1,
+    ) -> None:
         """
         Add a bought card: update cards list, bonuses, crowns, points.
-        For wildcard cards, wildcard_color must be provided.
+        For wildcard cards, wildcard_color and wildcard_count must be provided.
+        wildcard_count copies the bonus count of the card the wildcard is placed on.
         """
         self.cards.append(card)
         self.points += card.points
@@ -94,8 +100,7 @@ class PlayerState:
         if card.is_wildcard:
             assert wildcard_color is not None, "Must assign colour for wildcard"
             self.wildcard_assignments[card.id] = wildcard_color
-            # Wildcard gives 1 bonus of the chosen colour
-            self.bonuses[wildcard_color] += 1
+            self.bonuses[wildcard_color] += wildcard_count
         elif card.gem_bonus is not None:
             self.bonuses += np.array(card.gem_bonus, dtype=np.int8)
 

@@ -73,9 +73,11 @@ pip install -e .                # install package in editable mode
 ## Running tests
 
 ```bash
-# All tests
-pytest tests/ -v
+export PYTHONPATH=.
+pytest 
+```
 
+```bash
 # Single module
 pytest tests/test_board.py -v
 

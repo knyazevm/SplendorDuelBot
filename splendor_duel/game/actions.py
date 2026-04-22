@@ -89,8 +89,8 @@ class EffectTakeOpponentGem:
 
 @dataclass(frozen=True)
 class EffectChooseWildcard:
-    """Assign a bonus colour to a just-bought wildcard card."""
-    gem: int  # Gem index of colour to copy
+    """Place wildcard on an existing card to copy its bonus colour & count."""
+    target_card_index: int  # index into player.cards (must have bonus)
 
 
 @dataclass(frozen=True)
