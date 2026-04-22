@@ -120,6 +120,8 @@ def main():
     agents = {
         "Random": lambda: RandomAgent(),
         "Greedy": lambda: GreedyAgent(),
+        # "MCTS_fast": lambda: MCTSAgent(iterations=200, rollout='none'),
+        "MCTS_greedy": lambda: MCTSAgent(iterations=100, rollout='greedy', rollout_depth=20),
     }
     if args.include_mcts:
         iters = args.mcts_iters
