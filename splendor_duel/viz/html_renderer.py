@@ -205,7 +205,7 @@ function cardDigital(c) {
 // If images_dir = "../images", browser resolves: ../images/cards/L1_01.jpg
 // The onerror replaces the <img> with a digital card fallback.
 function cardImage(c) {
-    const src = IMAGES_DIR + '/cards/' + c.id + '.jpg';
+    const src = IMAGES_DIR + '/cards/' + c.id + '.png';
     // Encode the digital fallback as a data attribute to avoid escaping hell
     const fallbackId = 'fb_' + c.id.replace(/[^a-zA-Z0-9]/g,'_');
     return '<div class="card-img-wrap" title="'+c.id+'">'
