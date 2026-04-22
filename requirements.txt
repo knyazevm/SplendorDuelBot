@@ -3,3 +3,5 @@ pytest>=8.0
 gymnasium>=0.29
 torch>=2.2
 rich
+fastapi
+uvicorn

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Splendor Duel</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<div class="header">
+  <div class="header-left">
+    <span class="game-title">Splendor Duel</span>
+    <span class="phase-badge" id="phaseBadge">—</span>
+    <span class="turn-info" id="turnInfo"></span>
+  </div>
+  <div class="header-right">
+    <select id="agentSelect"></select>
+    <button onclick="window._newGame()">New Game</button>
+  </div>
+</div>
+
+<div class="game">
+  <div id="panelLeft" class="player"></div>
+
+  <div class="center">
+    <div class="board-wrap">
+      <div class="board-grid" id="boardGrid"></div>
+      <div class="board-meta">
+        <span id="scrollsInfo"></span>
+        <span id="bagInfo"></span>
+      </div>
+    </div>
+    <div id="actionBar" class="action-bar">
+      <span class="hint-text">Select an agent and start a new game →</span>
+    </div>
+    <div class="pyramid-wrap">
+      <div id="pyramidArea"></div>
+      <div class="sec-label" style="margin-top:10px">Royal Cards</div>
+      <div class="royals-row" id="royalsRow"></div>
+    </div>
+    <div id="gameOver" class="game-over hidden"></div>
+    <div class="log-wrap">
+      <div id="logArea"></div>
+    </div>
+  </div>
+
+  <div id="panelRight" class="player"></div>
+</div>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
