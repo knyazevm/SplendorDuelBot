@@ -19,7 +19,6 @@ from splendor_duel.game.constants import (
 from splendor_duel.game.player import PlayerState
 from splendor_duel.game.state import GameState
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 CARDS_JSON = {
@@ -50,15 +49,15 @@ def cards_path(tmp_path):
 
 
 def _make_card(
-    card_id: str = "T_01",
-    level: int = 1,
-    cost_white: int = 0,
-    bonus_gem: int = Gem.WHITE,
-    bonus_count: int = 1,
-    is_wildcard: bool = False,
-    points: int = 0,
-    crowns: int = 0,
-    ability: str | None = None,
+        card_id: str = "T_01",
+        level: int = 1,
+        cost_white: int = 0,
+        bonus_gem: int = Gem.WHITE,
+        bonus_count: int = 1,
+        is_wildcard: bool = False,
+        points: int = 0,
+        crowns: int = 0,
+        ability: str | None = None,
 ) -> Card:
     cost = tuple(cost_white if i == Gem.WHITE else 0 for i in range(N_GEMS))
     if is_wildcard:
@@ -306,14 +305,19 @@ class TestGameStateSetup:
     def test_second_player_has_scroll(self, cards_path):
         gs = GameState.new_game(cards_path)
         total_scrolls = (
-            gs.players[0].scrolls
-            + gs.players[1].scrolls
-            + gs.scrolls_center
+                gs.players[0].scrolls
+                + gs.players[1].scrolls
+                + gs.scrolls_center
         )
         assert total_scrolls == 3
         # Exactly one player has 1 scroll
         scroll_counts = [gs.players[0].scrolls, gs.players[1].scrolls]
         assert sorted(scroll_counts) == [0, 1]
+        # The scroll must belong to the player who does NOT go first
+        first = gs.current_player
+        second = 1 - first
+        assert gs.players[first].scrolls == 0, "First player should not have scroll"
+        assert gs.players[second].scrolls == 1, "Second player should have scroll"
 
     def test_pyramid_sizes(self, cards_path):
         gs = GameState.new_game(cards_path)
