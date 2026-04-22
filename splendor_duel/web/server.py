@@ -30,6 +30,13 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 
 app = FastAPI()
+
+# Serve card/gem images from project root images/ directory
+# Must be mounted BEFORE /static so the more specific path matches first
+IMAGES_DIR = Path(CARDS_PATH).parent.parent / "images"
+if IMAGES_DIR.exists():
+    app.mount("/static/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 

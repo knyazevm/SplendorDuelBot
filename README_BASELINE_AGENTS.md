@@ -1,5 +1,17 @@
 # Фаза 2 — Baseline агенты: инструкция
 
+## Игра с агентом
+```
+python scripts/play_web.py
+```
+
+Как играть:
+- OPTIONAL фаза → кнопка "Proceed →" или клик по доске (если есть свитки)
+- MAIN фаза → клик по 1-й ячейке доски, затем по 2-й → TakeTokens. Клик по карте пирамиды → popup "Buy" / "Reserve"
+- EFFECT фаза → клик по доске (take_same_gem) или кнопки (take_opponent_gem, wildcard)
+- ROYAL фаза → клик по royal-карте
+- DISCARD фаза → клик по своему токену
+
 ## Структура файлов
 
 Положить файлы в проект:
@@ -166,15 +178,3 @@ Greedy побеждает Random в 30/30 играх — эвристика ра
 - **MCTS медленный** из-за высокого branching factor (~118 действий в MAIN-фазе на полной доске). Оптимизации: короткие rollouts (40 шагов) + heuristic eval + progressive widening (cap 25 детей). Для AlphaZero (Фаза 4) нейросеть заменит rollouts.
 - **Greedy не использует reserve** активно — эвристика оценивает reserve с дисконтом 0.6x. Это сознательное упрощение.
 - **Random агент детерминистичен** при указании seed — удобно для отладки.
-
-## Игра с агентом
-```
-python scripts/play_web.py
-```
-
-Как играть:
-- OPTIONAL фаза → кнопка "Proceed →" или клик по доске (если есть свитки)
-- MAIN фаза → клик по 1-й ячейке доски, затем по 2-й → TakeTokens. Клик по карте пирамиды → popup "Buy" / "Reserve"
-- EFFECT фаза → клик по доске (take_same_gem) или кнопки (take_opponent_gem, wildcard)
-- ROYAL фаза → клик по royal-карте
-- DISCARD фаза → клик по своему токену

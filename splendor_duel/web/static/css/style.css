@@ -38,8 +38,8 @@ button{font-family:inherit;cursor:pointer}
 .header-right button:hover{background:var(--accent);color:var(--bg)}
 
 /* ── Game layout ──────────────────────────── */
-.game{display:grid;grid-template-columns:240px 1fr 240px;gap:10px;
-  max-width:1200px;margin:0 auto}
+.game{display:grid;grid-template-columns:minmax(200px,1fr) minmax(500px,2fr) minmax(200px,1fr);
+  gap:10px;margin:0 auto}
 
 /* ── Player panel ─────────────────────────── */
 .player{background:var(--panel);border-radius:12px;padding:14px;
@@ -64,14 +64,16 @@ button{font-family:inherit;cursor:pointer}
 .tok-n{font-size:12px;font-weight:600}
 .tok.clickable{cursor:pointer;border:1px solid transparent}
 .tok.clickable:hover{border-color:var(--accent)}
-.pl-cards{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.pl-cards{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
 .reserved-cards{display:flex;gap:4px;flex-wrap:wrap}
 
-/* Mini card */
-.mini-card{width:36px;height:28px;border-radius:4px;display:flex;
-  align-items:center;justify-content:center;font-size:10px;font-weight:700;
-  border:1px solid rgba(255,255,255,0.15)}
-.wc-mini{background:conic-gradient(var(--g-red) 0%,var(--g-blue) 25%,var(--g-green) 50%,var(--g-white) 75%)}
+/* Smaller cards for player panels */
+.card-sm{width:62px;min-height:84px;padding:3px 4px;font-size:10px}
+.card-sm .card-pts{font-size:14px}
+.card-sm .gem-circ{width:13px;height:13px}
+.card-sm .cost-dot{width:12px;height:12px;font-size:7px}
+.card-sm .card-abil{font-size:8px}
+.card-img-wrap.card-sm .card-img{width:62px;height:87px}
 
 /* ── Center column ────────────────────────── */
 .center{display:flex;flex-direction:column;gap:10px}
@@ -127,12 +129,6 @@ button{font-family:inherit;cursor:pointer}
 .card-img-wrap.buyable,.card-img-wrap.reservable{cursor:pointer}
 .card-img-wrap:hover{transform:scale(1.1);z-index:20;transition:transform 0.15s}
 .card-img{width:80px;height:112px;border-radius:6px;object-fit:cover;border:2px solid #444;display:block}
-
-/* Card action popup */
-.card-actions{position:absolute;top:-36px;left:50%;transform:translateX(-50%);
-  display:flex;gap:4px;z-index:30;white-space:nowrap}
-.card-actions button{padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:600}
-.btn-buy{background:var(--ok);color:#000}
 
 /* ── Royal cards ──────────────────────────── */
 .royals-row{display:flex;gap:6px;margin-top:8px}

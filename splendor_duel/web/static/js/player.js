@@ -81,7 +81,7 @@ export function renderPlayer(el, player, opts = {}) {
   h += `<div class="sec-label">Cards (${player.cards.length})</div><div class="pl-cards">`;
   if (player.cards.length > 0) {
     for (const c of player.cards) {
-      h += renderMiniCard(c, wca);
+      h += renderCard(c, { extraClass: 'card-sm', useImage: opts.useImages });
     }
   } else {
     h += '<span class="empty-hint">—</span>';
@@ -96,6 +96,7 @@ export function renderPlayer(el, player, opts = {}) {
       h += renderCard(c, {
         onclick: buyable ? `window._onBuyReserved(${idx})` : '',
         extraClass: buyable ? 'buyable' : '',
+        useImage: opts.useImages,
       });
     });
     h += '</div>';

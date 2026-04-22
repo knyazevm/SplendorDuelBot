@@ -9,8 +9,8 @@ import { renderPlayer } from './player.js';
 let G = null;           // current server response
 let selectedCell = null; // {r,c} or null (for TakeTokens first click)
 let reserveMode = false; // true after clicking gold
-let cardPopup = null;    // "level_index" key or null
 let busy = false;        // prevent double-clicks during async
+let useImages = false;   // toggle card images (set via UI or config)
 
 const AI_THINK_DELAY = 2000; // ms to show "AI thinking" before requesting AI turn
 
@@ -55,13 +55,19 @@ async function loadAgents() {
 async function newGame() {
   const agent = document.getElementById('agentSelect').value;
   resetInteraction();
+  busy = true;
   G = await api('/api/new_game', { agent, player_side: 0 });
-  if (!G) return;
-  render();
+  if (!G) { busy = false; return; }
   // If AI goes first, trigger AI turn
   if (G.is_ai_turn) {
+    render();
+    await sleep(1000);
     await runAiTurn();
   }
+  // Auto-skip trivial phases
+  while (await autoSkipIfTrivial()) {}
+  busy = false;
+  render();
 }
 
 async function sendAction(idx) {
@@ -72,11 +78,16 @@ async function sendAction(idx) {
   G = await api('/api/action', { action_index: idx });
   if (!G) { busy = false; return; }
 
+  // Auto-skip trivial phases (e.g. OPTIONAL with only ProceedToMain)
+  while (await autoSkipIfTrivial()) { /* keep skipping */ }
+
   if (G.is_ai_turn) {
     // Show board after our move, then AI thinking
     render();
     await sleep(AI_THINK_DELAY);
     await runAiTurn();
+    // After AI, auto-skip again if needed
+    while (await autoSkipIfTrivial()) {}
   }
 
   // Ready for next human interaction
@@ -94,7 +105,6 @@ async function runAiTurn() {
 function resetInteraction() {
   selectedCell = null;
   reserveMode = false;
-  cardPopup = null;
 }
 
 function setThinking(on) {
@@ -106,6 +116,19 @@ function setThinking(on) {
       <div class="thinking-dots"><span></span><span></span><span></span></div>
     </div>`;
   }
+}
+
+/**
+ * Auto-skip trivial phases (e.g. OPTIONAL with only ProceedToMain).
+ * Returns true if an auto-action was sent.
+ */
+async function autoSkipIfTrivial() {
+  if (!G || !G.is_human_turn || G.state.is_game_over) return false;
+  if (G.legal_actions.length === 1 && G.legal_actions[0].type === 'ProceedToMain') {
+    G = await api('/api/action', { action_index: 0 });
+    return true;
+  }
+  return false;
 }
 
 // ── Board interaction ────────────────────────────────────────
@@ -194,17 +217,14 @@ function onPyramidCard(level, index) {
     else showToast('Cannot reserve this card', 1200);
     return;
   }
-  // Toggle buy popup
-  const key = `${level}_${index}`;
-  cardPopup = cardPopup === key ? null : key;
-  render();
+  // Direct buy (no popup)
+  const idx = G.legal_actions.findIndex(a =>
+    a.type === 'BuyCard' && a.source === 'pyramid' && a.level === level && a.index === index);
+  if (idx >= 0) sendAction(idx);
+  else showToast('Cannot afford this card', 1200);
 }
 // Exposed to onclick strings in rendered HTML
-window._buyPyramid = (lvl, idx) => {
-  const i = G.legal_actions.findIndex(a =>
-    a.type === 'BuyCard' && a.source === 'pyramid' && a.level === lvl && a.index === idx);
-  if (i >= 0) sendAction(i);
-};
+window._buyPyramid = (lvl, idx) => onPyramidCard(lvl, idx);
 window._reserveDeck = (lvl) => {
   const i = G.legal_actions.findIndex(a =>
     a.type === 'ReserveCard' && a.source === 'deck' && a.level === lvl);
@@ -276,7 +296,7 @@ function render() {
 
   // Players
   renderPlayer(document.getElementById('panelLeft'), st.players[hp], {
-    label: 'You', isHuman: true,
+    label: 'You', isHuman: true, useImages,
     isActive: hp === st.current_player && !st.is_game_over,
     canDiscard: (gem) => G.is_human_turn && st.phase === 'DISCARD'
       && G.legal_actions.some(a => a.type === 'DiscardToken' && a.gem === GEM_NAMES[gem]),
@@ -286,7 +306,7 @@ function render() {
     onBuyReserved: window._onBuyReserved,
   });
   renderPlayer(document.getElementById('panelRight'), st.players[ai], {
-    label: `AI (${G.agent_name})`, isHuman: false,
+    label: `AI (${G.agent_name})`, isHuman: false, useImages,
     isActive: ai === st.current_player && !st.is_game_over,
   });
 
@@ -319,16 +339,10 @@ function renderPyramidSection(st) {
       const canRes = reserveMode && G.is_human_turn && st.phase === 'MAIN' && !busy
         && G.legal_actions.some(a => a.type === 'ReserveCard' && a.source === 'pyramid' && a.level === lvl && a.index === idx);
       const cls = canRes ? 'reservable' : (canBuy ? 'buyable' : '');
-      const onclick = (canBuy || canRes) ? `event.stopPropagation();window._onPyramidCard(${lvl},${idx})` : '';
+      const onclick = (canBuy || canRes)
+        ? `event.stopPropagation();window._onPyramidCard(${lvl},${idx})` : '';
 
-      let popup = '';
-      if (!reserveMode && cardPopup === `${lvl}_${idx}` && canBuy) {
-        popup = `<div class="card-actions">
-          <button class="btn-buy" onclick="event.stopPropagation();window._buyPyramid(${lvl},${idx})">Buy</button>
-        </div>`;
-      }
-
-      h += `<div style="position:relative">${popup}${renderCard(c, { onclick, extraClass: cls })}</div>`;
+      h += renderCard(c, { onclick, extraClass: cls, useImage: useImages });
     });
     // Deck
     const canResDeck = reserveMode && G.is_human_turn && st.phase === 'MAIN' && !busy
@@ -431,13 +445,8 @@ function renderGameOver(st) {
     <button onclick="window._newGame()" class="new-game-btn">Play Again</button>`;
 }
 
-// Close popup on outside click
-document.addEventListener('click', (e) => {
-  if (cardPopup && !e.target.closest('.card') && !e.target.closest('.card-actions')) {
-    cardPopup = null;
-    render();
-  }
-});
+// Toggle images
+window._toggleImages = () => { useImages = !useImages; if (G) render(); };
 
 // ── Init ─────────────────────────────────────────────────────
 window._newGame = newGame;
