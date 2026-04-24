@@ -60,6 +60,39 @@ AGENTS = {
 }
 
 
+# Auto-register neural network agents if checkpoints exist
+def _try_register_ppo():
+    import glob
+    ppo_files = sorted(glob.glob("checkpoints/ppo_*.pt"))
+    if not ppo_files:
+        return
+    try:
+        from splendor_duel.agents.ppo import PPOAgent
+        for path in ppo_files:
+            name = Path(path).stem  # e.g. ppo_100
+            AGENTS[name] = lambda p=path: PPOAgent.load(p)
+    except Exception as e:
+        print(f"PPO registration failed: {e}")
+
+
+def _try_register_az():
+    import glob
+    az_files = sorted(glob.glob("checkpoints_az/az_*.pt"))
+    if not az_files:
+        return
+    try:
+        from splendor_duel.agents.az import AZAgent
+        for path in az_files:
+            name = Path(path).stem  # e.g. az_10
+            AGENTS[name] = lambda p=path: AZAgent.load(p, n_simulations=100)
+    except Exception as e:
+        print(f"AZ registration failed: {e}")
+
+
+_try_register_ppo()
+_try_register_az()
+
+
 # ── Request models ────────────────────────────────────────────────────────────
 
 class NewGameRequest(BaseModel):
