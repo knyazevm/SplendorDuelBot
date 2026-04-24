@@ -23,7 +23,10 @@ from collections import defaultdict
 sys.path.insert(0, '.')
 
 from splendor_duel.agents import (
-    RandomAgent, GreedyAgent, GreedyByChatGPT, GeminiGreedyAgent, GreedyByClaude, MCTSAgent, play_game, GameResult,
+    RandomAgent, GreedyAgent,
+    GreedyByChatGPT, GeminiGreedyAgent, GreedyByClaude,
+    GreedyByChatGPTV2, GeminiGreedyAgentV2, GreedyByClaudeV2,
+    MCTSAgent, play_game, GameResult,
 )
 
 CARDS_PATH = "data/cards.json"
@@ -118,13 +121,16 @@ def main():
 
     # Agent factories (create fresh agent per game)
     agents = {
-        "Random": lambda: RandomAgent(),
-        "Greedy": lambda: GreedyAgent(),
+        # "Random": lambda: RandomAgent(),
         # "MCTS_fast": lambda: MCTSAgent(iterations=200, rollout='none'),
         # "MCTS_greedy": lambda: MCTSAgent(iterations=100, rollout='greedy', rollout_depth=20),
-        "GreedyByChatGPT": lambda: GreedyByChatGPT(seed=1),
-        "GeminiGreedyAgent": lambda: GeminiGreedyAgent(seed=1),
-        "GreedyByClaude": lambda: GreedyByClaude(seed=1),
+        # "Greedy": lambda: GreedyAgent(),
+        # "GreedyByChatGPT": lambda: GreedyByChatGPT(seed=1),
+        # "GeminiGreedyAgent": lambda: GeminiGreedyAgent(seed=1),
+        # "GreedyByClaude": lambda: GreedyByClaude(seed=1),
+        "GreedyByChatGPTV2": lambda: GreedyByChatGPTV2(seed=1),
+        "GeminiGreedyAgentV2": lambda: GeminiGreedyAgentV2(seed=1),
+        "GreedyByClaudeV2": lambda: GreedyByClaudeV2(seed=1),
     }
     if args.include_mcts:
         iters = args.mcts_iters
