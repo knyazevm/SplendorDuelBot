@@ -163,10 +163,13 @@ env = SplendorDuelEnv(opponent="self")
 
 ```
 # 1. Быстрый тест (~5 мин): должен начать побеждать Random
-python scripts/train_ppo.py --opponent random --steps 50000 --device cuda
+python scripts/train_ppo.py --opponent random --steps 50000
 
 # 2. Основное обучение vs Greedy (~1-2 часа на CPU)
 python scripts/train_ppo.py --opponent greedy --steps 500000
+
+
+python scripts/train_ppo.py --curriculum --steps 500000
 
 # 3. С GPU (если есть)
 python scripts/train_ppo.py --opponent greedy --steps 500000 --device cuda

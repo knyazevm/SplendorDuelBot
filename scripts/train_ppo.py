@@ -29,6 +29,7 @@ def train(args):
 
     trainer = PPOTrainer(
         opponent=args.opponent,
+        curriculum=args.curriculum,
         lr=args.lr,
         n_steps=args.n_steps,
         n_epochs=args.n_epochs,
@@ -42,7 +43,8 @@ def train(args):
         trainer.load(args.resume)
         print(f"Resumed from {args.resume} (update {trainer.total_updates})")
 
-    print(f"Training PPO vs {args.opponent}")
+    mode = "curriculum (Random→Greedy)" if args.curriculum else f"vs {args.opponent}"
+    print(f"Training PPO {mode}")
     print(f"  Steps: {args.steps}, Device: {args.device}")
     print(f"  LR: {args.lr}, Batch: {args.batch_size}, Steps/update: {args.n_steps}")
     print()
@@ -89,12 +91,14 @@ def main():
     parser.add_argument("--eval-games", type=int, default=30)
     parser.add_argument("--opponent", default="greedy",
                         choices=["random", "greedy", "self"])
+    parser.add_argument("--curriculum", action="store_true",
+                        help="Curriculum: start vs Random, gradually shift to Greedy")
     parser.add_argument("--steps", type=int, default=500_000)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--resume", type=str, default=None)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--n-steps", type=int, default=2048)
-    parser.add_argument("--n-epochs", type=int, default=4)
+    parser.add_argument("--n-epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--entropy-coeff", type=float, default=0.01)
     parser.add_argument("--log-interval", type=int, default=5)

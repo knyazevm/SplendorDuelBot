@@ -126,10 +126,19 @@ class SplendorDuelEnv(gym.Env):
             if self._state.current_player != self._my_player:
                 self._run_opponent()
 
+            # Edge case: opponent won during opening → re-roll
+            if self._state.is_game_over:
+                return self.reset(seed=None, options=options)
+
         self._prev_points = float(self._state.players[self._my_player].points)
 
         obs = encode_state(self._state)
         info = self._make_info()
+
+        # Safety: ensure mask is non-empty
+        if info["legal_mask"].sum() == 0 and not self._state.is_game_over:
+            return self.reset(seed=None, options=options)
+
         return obs, info
 
     def step(self, action: int):
@@ -138,24 +147,42 @@ class SplendorDuelEnv(gym.Env):
 
         mask = compute_legal_mask(self._state)
         if not mask[action]:
-            # Illegal action — large penalty, game continues
-            obs = encode_state(self._state)
-            info = self._make_info()
-            return obs, -10.0, False, False, info
+            # Illegal action — auto-pick a legal one with penalty
+            legal_indices = np.where(mask)[0]
+            if len(legal_indices) == 0:
+                # No legal actions at all — treat as loss
+                obs = encode_state(self._state)
+                info = self._make_info()
+                return obs, -1.0, True, False, info
+            action = int(legal_indices[0])
+            penalty = -0.5
+        else:
+            penalty = 0.0
 
-        # Apply action
+        # Apply action (with defensive try/catch for edge cases)
         game_action = index_to_action(action)
-        self._state = GameEngine.apply_action(self._state, game_action)
+        try:
+            new_state = GameEngine.apply_action(self._state, game_action)
+        except (IndexError, ValueError, KeyError):
+            # Action was in mask but engine rejects it (rare race condition
+            # or mask/engine mismatch). Fall back to a safe action.
+            actions = GameEngine.get_legal_actions(self._state)
+            if not actions:
+                obs = encode_state(self._state)
+                info = self._make_info()
+                return obs, -1.0, True, False, info
+            new_state = GameEngine.apply_action(self._state, actions[0])
+            penalty -= 0.5
+        self._state = new_state
 
         # Check if game ended
         if self._state.is_game_over:
-            return self._terminal_step()
+            obs, reward, done, trunc, info = self._terminal_step()
+            return obs, reward + penalty, done, trunc, info
 
         if self.self_play:
-            # In self-play, just return — caller handles both sides
-            # Observation is always from active player's perspective
             obs = encode_state(self._state)
-            reward = self._compute_reward()
+            reward = self._compute_reward() + penalty
             info = self._make_info()
             return obs, reward, False, False, info
 
@@ -163,7 +190,7 @@ class SplendorDuelEnv(gym.Env):
         # return immediately for the next sub-action
         if self._state.current_player == self._my_player:
             obs = encode_state(self._state)
-            reward = self._compute_reward()
+            reward = self._compute_reward() + penalty
             info = self._make_info()
             return obs, reward, False, False, info
 
@@ -171,12 +198,13 @@ class SplendorDuelEnv(gym.Env):
         self._run_opponent()
 
         if self._state.is_game_over:
-            return self._terminal_step()
+            obs, reward, done, trunc, info = self._terminal_step()
+            return obs, reward + penalty, done, trunc, info
 
         # Truncation check
         truncated = (self.max_turns > 0 and self._state.turn > self.max_turns)
         obs = encode_state(self._state)
-        reward = self._compute_reward()
+        reward = self._compute_reward() + penalty
         info = self._make_info()
         return obs, reward, False, truncated, info
 

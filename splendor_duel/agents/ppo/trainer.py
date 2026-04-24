@@ -11,6 +11,7 @@ Usage:
 """
 from __future__ import annotations
 
+import random
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,7 +50,7 @@ class RolloutBuffer:
 
     def clear(self):
         for lst in [self.obs, self.actions, self.log_probs,
-                    self.values, self.rewards, self.dones, self.masks]:
+                     self.values, self.rewards, self.dones, self.masks]:
             lst.clear()
 
     def __len__(self):
@@ -57,12 +58,12 @@ class RolloutBuffer:
 
 
 def compute_gae(
-        rewards: np.ndarray,
-        values: np.ndarray,
-        dones: np.ndarray,
-        last_value: float,
-        gamma: float = 0.99,
-        gae_lambda: float = 0.95,
+    rewards: np.ndarray,
+    values: np.ndarray,
+    dones: np.ndarray,
+    last_value: float,
+    gamma: float = 0.99,
+    gae_lambda: float = 0.95,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute GAE advantages and returns.
@@ -108,20 +109,21 @@ class PPOTrainer:
     """
 
     def __init__(
-            self,
-            opponent: str = "greedy",
-            lr: float = 3e-4,
-            gamma: float = 0.99,
-            gae_lambda: float = 0.95,
-            clip_epsilon: float = 0.2,
-            entropy_coeff: float = 0.01,
-            value_coeff: float = 0.5,
-            max_grad_norm: float = 0.5,
-            n_steps: int = 2048,
-            n_epochs: int = 4,
-            batch_size: int = 256,
-            device: str = "cpu",
-            cards_path: str = "data/cards.json",
+        self,
+        opponent: str = "greedy",
+        curriculum: bool = False,
+        lr: float = 1e-4,
+        gamma: float = 0.99,
+        gae_lambda: float = 0.95,
+        clip_epsilon: float = 0.2,
+        entropy_coeff: float = 0.01,
+        value_coeff: float = 0.5,
+        max_grad_norm: float = 0.5,
+        n_steps: int = 2048,
+        n_epochs: int = 3,
+        batch_size: int = 256,
+        device: str = "cpu",
+        cards_path: str = "data/cards.json",
     ):
         self.device = torch.device(device)
         self.gamma = gamma
@@ -133,13 +135,23 @@ class PPOTrainer:
         self.n_steps = n_steps
         self.n_epochs = n_epochs
         self.batch_size = batch_size
+        self.curriculum = curriculum
 
         self.network = SplendorNetwork().to(self.device)
         self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
 
-        self.env = SplendorDuelEnv(
-            opponent=opponent, cards_path=cards_path, max_turns=200,
-        )
+        if curriculum:
+            self.env_random = SplendorDuelEnv(
+                opponent="random", cards_path=cards_path, max_turns=200,
+            )
+            self.env_greedy = SplendorDuelEnv(
+                opponent="greedy", cards_path=cards_path, max_turns=200,
+            )
+            self.env = self.env_random  # start with random
+        else:
+            self.env = SplendorDuelEnv(
+                opponent=opponent, cards_path=cards_path, max_turns=200,
+            )
         self.buffer = RolloutBuffer()
 
         # Stats
@@ -149,12 +161,12 @@ class PPOTrainer:
         self.win_history: list[float] = []  # rolling window
 
     def train(
-            self,
-            total_steps: int = 500_000,
-            log_interval: int = 5,
-            save_interval: int = 50,
-            save_dir: str = "checkpoints",
-            eval_games: int = 20,
+        self,
+        total_steps: int = 500_000,
+        log_interval: int = 5,
+        save_interval: int = 50,
+        save_dir: str = "checkpoints",
+        eval_games: int = 20,
     ):
         """
         Main training loop.
@@ -203,6 +215,12 @@ class PPOTrainer:
                     ep_wins.append(win)
                     ep_rewards = 0.0
 
+                    # Curriculum: switch opponent based on progress
+                    if self.curriculum:
+                        progress = steps_done / total_steps
+                        use_greedy = random.random() < self._greedy_prob(progress)
+                        self.env = self.env_greedy if use_greedy else self.env_random
+
                     obs_np, info = self.env.reset()
 
                 obs_t = torch.tensor(obs_np, dtype=torch.float32, device=self.device)
@@ -231,6 +249,11 @@ class PPOTrainer:
                 recent_wr = np.mean(ep_wins[-100:]) if ep_wins else 0
                 elapsed = time.time() - t_start
                 sps = steps_done / elapsed if elapsed > 0 else 0
+                rollback = " [ROLLBACK]" if stats.get('nan_rollback') else ""
+                cur_info = ""
+                if self.curriculum:
+                    gp = self._greedy_prob(steps_done / total_steps)
+                    cur_info = f" | Greedy {gp:.0%}"
                 print(
                     f"Update {self.total_updates:4d} | "
                     f"Steps {steps_done:7d}/{total_steps} | "
@@ -238,7 +261,7 @@ class PPOTrainer:
                     f"WinRate {recent_wr:.1%} | "
                     f"Loss {stats['total_loss']:.3f} | "
                     f"Entropy {stats['entropy']:.3f} | "
-                    f"SPS {sps:.0f}"
+                    f"SPS {sps:.0f}{cur_info}{rollback}"
                 )
 
             # ── Save ──────────────────────────────────────────
@@ -254,9 +277,13 @@ class PPOTrainer:
               f"{steps_done} steps in {elapsed:.0f}s")
 
     def _update(self, advantages: np.ndarray, returns: np.ndarray) -> dict:
-        """Run PPO SGD epochs on the buffer."""
+        """Run PPO SGD epochs on the buffer, with NaN rollback protection."""
         self.network.train()
         n = len(self.buffer)
+
+        # Save weights for rollback if NaN occurs
+        import copy
+        weight_backup = copy.deepcopy(self.network.state_dict())
 
         # Convert buffer to tensors
         b_obs = torch.tensor(np.array(self.buffer.obs), dtype=torch.float32, device=self.device)
@@ -266,6 +293,9 @@ class PPOTrainer:
         b_advantages = torch.tensor(advantages, dtype=torch.float32, device=self.device)
         b_returns = torch.tensor(returns, dtype=torch.float32, device=self.device)
 
+        # Clamp returns to prevent extreme targets
+        b_returns = b_returns.clamp(-2.0, 2.0)
+
         # Normalise advantages
         b_advantages = (b_advantages - b_advantages.mean()) / (b_advantages.std() + 1e-8)
 
@@ -273,9 +303,11 @@ class PPOTrainer:
         total_v_loss = 0.0
         total_entropy = 0.0
         n_batches = 0
+        nan_detected = False
 
         for _ in range(self.n_epochs):
-            # Shuffle indices
+            if nan_detected:
+                break
             indices = torch.randperm(n, device=self.device)
 
             for start in range(0, n, self.batch_size):
@@ -288,13 +320,14 @@ class PPOTrainer:
 
                 # PPO clipped policy loss
                 ratio = torch.exp(log_probs - b_old_log_probs[idx])
+                ratio = ratio.clamp(0.0, 5.0)
                 adv = b_advantages[idx]
                 pg_loss1 = -adv * ratio
                 pg_loss2 = -adv * torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                v_loss = nn.functional.mse_loss(values, b_returns[idx])
+                v_loss = nn.functional.huber_loss(values, b_returns[idx])
 
                 # Entropy bonus
                 entropy_loss = -entropy.mean()
@@ -302,22 +335,58 @@ class PPOTrainer:
                 # Total loss
                 loss = pg_loss + self.value_coeff * v_loss + self.entropy_coeff * entropy_loss
 
+                if torch.isnan(loss) or torch.isinf(loss):
+                    continue
+
                 self.optimizer.zero_grad()
                 loss.backward()
+
+                # Clip by value AND by norm
+                nn.utils.clip_grad_value_(self.network.parameters(), 1.0)
                 nn.utils.clip_grad_norm_(self.network.parameters(), self.max_grad_norm)
+
                 self.optimizer.step()
+
+                # Check for NaN in weights after step
+                if any(torch.isnan(p).any().item() for p in self.network.parameters()):
+                    nan_detected = True
+                    break
 
                 total_pg_loss += pg_loss.item()
                 total_v_loss += v_loss.item()
                 total_entropy += entropy.mean().item()
                 n_batches += 1
 
+        # Rollback if NaN detected in weights
+        if nan_detected:
+            self.network.load_state_dict(weight_backup)
+            # Also reset optimizer state to prevent stale momentum
+            self.optimizer = optim.Adam(
+                self.network.parameters(),
+                lr=self.optimizer.param_groups[0]['lr'],
+            )
+
         return {
             "total_loss": (total_pg_loss + total_v_loss) / max(n_batches, 1),
             "policy_loss": total_pg_loss / max(n_batches, 1),
             "value_loss": total_v_loss / max(n_batches, 1),
             "entropy": total_entropy / max(n_batches, 1),
+            "nan_rollback": nan_detected,
         }
+
+    @staticmethod
+    def _greedy_prob(progress: float) -> float:
+        """Probability of playing vs Greedy given training progress [0, 1].
+
+        0%→30%:   0.0 (pure Random)
+        30%→70%:  linear 0→1
+        70%→100%: 1.0 (pure Greedy)
+        """
+        if progress < 0.3:
+            return 0.0
+        if progress > 0.7:
+            return 1.0
+        return (progress - 0.3) / 0.4
 
     def save(self, path: str):
         torch.save({

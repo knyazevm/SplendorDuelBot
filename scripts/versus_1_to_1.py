@@ -2,10 +2,11 @@ import random
 
 random.seed(42)
 
-from splendor_duel.agents import RandomAgent, GreedyAgent, MCTSAgent, play_game
+from splendor_duel.agents import GreedyAgent, MCTSAgent, play_game
+from splendor_duel.agents.ppo import PPOAgent
 
 result = play_game(
-    MCTSAgent(iterations=200, rollout='none'),  # GreedyAgent(seed=1),
+    PPOAgent.load("checkpoints/ppo_200.pt"),
     MCTSAgent(iterations=100, rollout='greedy', rollout_depth=20),
     "data/cards.json",
     verbose=True,
