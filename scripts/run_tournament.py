@@ -23,7 +23,7 @@ from collections import defaultdict
 sys.path.insert(0, '.')
 
 from splendor_duel.agents import (
-    RandomAgent, GreedyAgent, GreedyByChatGPT, GeminiGreedyAgent, MCTSAgent, play_game, GameResult,
+    RandomAgent, GreedyAgent, GreedyByChatGPT, GeminiGreedyAgent, GreedyByClaude, MCTSAgent, play_game, GameResult,
 )
 
 CARDS_PATH = "data/cards.json"
@@ -124,6 +124,7 @@ def main():
         # "MCTS_greedy": lambda: MCTSAgent(iterations=100, rollout='greedy', rollout_depth=20),
         "GreedyByChatGPT": lambda: GreedyByChatGPT(seed=1),
         "GeminiGreedyAgent": lambda: GeminiGreedyAgent(seed=1),
+        "GreedyByClaude": lambda: GreedyByClaude(seed=1),
     }
     if args.include_mcts:
         iters = args.mcts_iters
