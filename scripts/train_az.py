@@ -79,6 +79,10 @@ def evaluate(args):
     from splendor_duel.agents import (
         RandomAgent, GreedyAgent, MCTSAgent, play_game,
     )
+    from splendor_duel.agents import (
+        GreedyByChatGPT, GeminiGreedyAgent, GreedyByClaude,
+        GreedyByChatGPTV2, GeminiGreedyAgentV2, GreedyByClaudeV2,
+    )
 
     agent = AZAgent.load(
         args.eval, n_simulations=args.sims, device=args.device,
@@ -89,6 +93,12 @@ def evaluate(args):
         opponents = {
             "Random": lambda: RandomAgent(),
             "Greedy": lambda: GreedyAgent(),
+            # "GreedyByChatGPT": lambda: GreedyByChatGPT(seed=1),
+            # "GeminiGreedyAgent": lambda: GeminiGreedyAgent(seed=1),
+            # "GreedyByClaude": lambda: GreedyByClaude(seed=1),
+            # "GreedyByChatGPTV2": lambda: GreedyByChatGPTV2(seed=1),
+            # "GeminiGreedyAgentV2": lambda: GeminiGreedyAgentV2(seed=1),
+            # "GreedyByClaudeV2": lambda: GreedyByClaudeV2(seed=1),
             "MCTS(100,greedy)": lambda: MCTSAgent(
                 iterations=100, rollout='greedy', rollout_depth=20,
             ),
