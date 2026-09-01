@@ -16,7 +16,7 @@ import numpy as np
 import torch
 
 from splendor_duel.agents.base_agent import BaseAgent
-from splendor_duel.agents.ppo.network import SplendorNetwork
+from splendor_duel.agents.ppo.network import SplendorNetwork, load_network_from_checkpoint
 from splendor_duel.env.action_map import action_to_index, index_to_action
 from splendor_duel.game.actions import Action
 from splendor_duel.game.engine import GameEngine
@@ -64,14 +64,8 @@ class AZAgent(BaseAgent):
             deterministic: bool = True,
             device: str = "cpu",
     ) -> "AZAgent":
-        network = SplendorNetwork()
-        data = torch.load(path, map_location=device, weights_only=False)
-        if "network" in data:
-            network.load_state_dict(data["network"])
-        else:
-            network.load_state_dict(data)
-        network.to(device)
-        iters = data.get("total_iterations", "?") if isinstance(data, dict) else "?"
+        network, data = load_network_from_checkpoint(path, device=device)
+        iters = data.get("total_iterations", "?")
         return cls(
             network=network,
             n_simulations=n_simulations,

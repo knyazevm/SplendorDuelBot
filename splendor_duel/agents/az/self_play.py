@@ -35,6 +35,13 @@ class TrainingExample:
     mask: np.ndarray  # [N_ACTIONS] bool
     value: float  # filled after game ends
     current_player: int  # who acted at this position
+    # 1.0 = train the policy head on this position, 0.0 = value target only.
+    # Playout cap randomization (see self_play_v2) records most positions with
+    # weight 0: they were played with a small search whose visit distribution
+    # is too noisy to be a policy target, but whose game outcome is still a
+    # perfectly good value target. Defaults to 1.0 so every existing caller
+    # and every previously pickled buffer behaves exactly as before.
+    policy_weight: float = 1.0
 
 
 def _sample_action(visits: np.ndarray, temperature: float, rng: np.random.Generator) -> int:

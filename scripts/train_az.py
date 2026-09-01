@@ -29,6 +29,12 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
+def _parse_hidden_sizes(s: str) -> tuple[int, ...]:
+    """'512,512,512,512' -> (512, 512, 512, 512). '256,128' reproduces the
+    original (legacy) trunk size."""
+    return tuple(int(x) for x in s.split(","))
+
+
 def train(args):
     from splendor_duel.agents.az import AZTrainer
 
@@ -49,11 +55,15 @@ def train(args):
         eval_every=args.eval_every,
         eval_games=args.eval_games_during_train,
         eval_opponents=args.eval_vs_during_train.split(",") if args.eval_vs_during_train else ["greedy"],
+        hidden_sizes=args.hidden_sizes,
     )
 
     if args.resume:
         trainer.load(args.resume)
-        print(f"Resumed from {args.resume} (iter {trainer.total_iterations})")
+        buffer_restored = trainer.load_buffer_near(args.resume)
+        buffer_msg = (f"buffer restored ({len(trainer.buffer)} examples)" if buffer_restored
+                      else "no replay_buffer.pkl found next to it — starting with empty buffer")
+        print(f"Resumed from {args.resume} (iter {trainer.total_iterations}), {buffer_msg}")
 
     print(f"Training AlphaZero")
     print(f"  Iterations: {args.iterations}")
@@ -61,6 +71,8 @@ def train(args):
     print(f"  MCTS sims per move: {args.simulations}")
     print(f"  Epochs per iter: {args.epochs_per_iter}")
     print(f"  Buffer: {args.buffer_size}, Batch: {args.batch_size}")
+    print(f"  Hidden sizes (requested): {args.hidden_sizes} "
+          f"— actual network: {trainer.network.hidden_sizes}")
     print(f"  Device: {args.device}")
     if args.init:
         print(f"  Warm-start: {args.init}")
@@ -162,6 +174,10 @@ def main():
     p.add_argument("--value-coeff", type=float, default=1.0)
     p.add_argument("--buffer-size", type=int, default=50_000)
     p.add_argument("--batch-size", type=int, default=256)
+    p.add_argument("--hidden-sizes", type=_parse_hidden_sizes, default="512,512,512,512",
+                   help="Comma-separated trunk layer widths for a fresh network "
+                        "(ignored when --resume/--init load a checkpoint — its own "
+                        "architecture wins). Use '256,128' for the original/legacy size.")
 
     # Logging
     p.add_argument("--log-interval", type=int, default=1)

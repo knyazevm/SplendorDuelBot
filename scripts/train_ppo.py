@@ -24,6 +24,12 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
+def _parse_hidden_sizes(s: str) -> tuple[int, ...]:
+    """'512,512,512,512' -> (512, 512, 512, 512). '256,128' reproduces the
+    original (legacy) trunk size."""
+    return tuple(int(x) for x in s.split(","))
+
+
 def train(args):
     from splendor_duel.agents.ppo import PPOTrainer
 
@@ -37,6 +43,7 @@ def train(args):
         entropy_coeff=args.entropy_coeff,
         device=args.device,
         cards_path="data/cards.json",
+        hidden_sizes=args.hidden_sizes,
     )
 
     if args.resume:
@@ -47,6 +54,8 @@ def train(args):
     print(f"Training PPO {mode}")
     print(f"  Steps: {args.steps}, Device: {args.device}")
     print(f"  LR: {args.lr}, Batch: {args.batch_size}, Steps/update: {args.n_steps}")
+    print(f"  Hidden sizes (requested): {args.hidden_sizes} "
+          f"— actual network: {trainer.network.hidden_sizes}")
     print()
 
     trainer.train(
@@ -100,6 +109,10 @@ def main():
     parser.add_argument("--n-steps", type=int, default=2048)
     parser.add_argument("--n-epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--hidden-sizes", type=_parse_hidden_sizes, default="512,512,512,512",
+                        help="Comma-separated trunk layer widths for a fresh network "
+                             "(ignored when --resume loads a checkpoint — its own "
+                             "architecture wins). Use '256,128' for the original/legacy size.")
     parser.add_argument("--entropy-coeff", type=float, default=0.01)
     parser.add_argument("--log-interval", type=int, default=5)
     parser.add_argument("--save-interval", type=int, default=50)

@@ -40,7 +40,7 @@ class AZNode:
     __slots__ = (
         'state', 'player_to_act', 'is_terminal', 'terminal_value',
         'priors', 'visit_count', 'value_sum', 'children',
-        'legal_mask_np', 'legal_actions', 'total_visits', 'expanded',
+        'legal_mask_np', 'legal_idx', 'legal_actions', 'total_visits', 'expanded',
     )
 
     def __init__(self, state: GameState):
@@ -53,6 +53,7 @@ class AZNode:
         self.visit_count: Optional[np.ndarray] = None
         self.value_sum: Optional[np.ndarray] = None
         self.legal_mask_np: Optional[np.ndarray] = None
+        self.legal_idx: Optional[np.ndarray] = None  # indices where mask is True
         self.legal_actions: Optional[list[tuple[int, Action]]] = None
         self.total_visits: int = 0
         self.expanded: bool = False
@@ -124,6 +125,19 @@ class NetworkEvaluator:
                     (illegal actions get 0 probability)
             value:  scalar in [-1, 1] from perspective of current_player
         """
+        policy, value, _mask = self.evaluate_with_mask(state)
+        return policy, value
+
+    def evaluate_with_mask(
+            self, state: GameState,
+    ) -> tuple[np.ndarray, float, np.ndarray]:
+        """
+        As evaluate(), but also returns the legal mask it had to build anyway.
+
+        Callers that need the mask should use this — building it means
+        generating every legal action, which is one of the most expensive
+        operations in the search.
+        """
         obs = encode_state(state)
         mask = legal_mask(state)
 
@@ -145,7 +159,7 @@ class NetworkEvaluator:
         else:
             policy = exp_logits / total
 
-        return policy.astype(np.float32), value
+        return policy.astype(np.float32), value, mask
 
 
 # ── PUCT MCTS ─────────────────────────────────────────────────────────────────
@@ -153,25 +167,55 @@ class NetworkEvaluator:
 def _select_child_puct(
         node: AZNode, c_puct: float,
 ) -> int:
-    """PUCT selection: argmax_a [ Q(s,a) + c_puct * P(s,a) * sqrt(sum N) / (1 + N(s,a)) ]"""
+    """PUCT selection: argmax_a [ Q(s,a) + c_puct * P(s,a) * sqrt(sum N) / (1 + N(s,a)) ]
+
+    Scores only the legal actions rather than all N_ACTIONS and masking after,
+    which avoids allocating several 265-wide temporaries per simulation.
+    """
+    idx = node.legal_idx
+    if idx.size == 0:
+        return 0
+
     sqrt_total = math.sqrt(max(node.total_visits, 1))
 
-    # Q values (mean value); use FPU of 0 for unvisited
-    visits = node.visit_count
-    # Avoid division by zero; where visits=0, Q=0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        q = np.where(visits > 0, node.value_sum / np.maximum(visits, 1), 0.0)
-    u = c_puct * node.priors * sqrt_total / (1 + visits)
+    # Q values (mean value). value_sum is 0 wherever visits is 0, so the
+    # clamped divide already yields the FPU of 0 for unvisited actions.
+    visits = node.visit_count[idx]
+    q = node.value_sum[idx] / np.maximum(visits, 1.0)
+    u = (c_puct * sqrt_total) * node.priors[idx] / (1.0 + visits)
 
-    # Apply legal mask: illegal actions get -inf
-    score = q + u
-    score[~node.legal_mask_np] = -1e18
+    return int(idx[np.argmax(q + u)])
 
-    return int(np.argmax(score))
+
+def _apply_top_k(node: AZNode, top_k: int) -> None:
+    """Restrict this node's search to its `top_k` highest-prior actions.
+
+    Wide positions starve the search: a MAIN node with ~48 legal actions and
+    ~234 simulations gets ~5 visits per action, and two independent searches
+    from the same position then disagree by 2.969 nats — far more than the
+    0.97 by which the network misses the target. Capping the branching spends
+    the same simulations on fewer actions instead of spreading them to noise.
+    (`mcts_agent.py` already does this with a ~25-child cap; the AZ search
+    never inherited it.)
+
+    Priors are renormalised over the survivors so the PUCT exploration term
+    keeps its intended scale. `legal_mask_np` is deliberately left intact —
+    it is the training target's mask and must stay the true legal set.
+    """
+    idx = node.legal_idx
+    if top_k <= 0 or idx.size <= top_k:
+        return
+    keep = idx[np.argpartition(-node.priors[idx], top_k - 1)[:top_k]]
+    node.legal_idx = np.sort(keep)
+    total = float(node.priors[node.legal_idx].sum())
+    if total > 1e-12:
+        pruned = np.zeros_like(node.priors)
+        pruned[node.legal_idx] = node.priors[node.legal_idx] / total
+        node.priors = pruned
 
 
 def _expand_node(
-        node: AZNode, evaluator: NetworkEvaluator,
+        node: AZNode, evaluator: NetworkEvaluator, top_k: int = 0,
 ) -> float:
     """
     Expand a leaf node: query network, store priors + mask, return value.
@@ -185,14 +229,15 @@ def _expand_node(
         # Use a sentinel: if is_terminal, backprop handles it separately.
         return 0.0  # placeholder; backprop uses node.terminal_value
 
-    policy, value = evaluator.evaluate(node.state)
-    mask = legal_mask(node.state)
+    policy, value, mask = evaluator.evaluate_with_mask(node.state)
 
     node.priors = policy
     node.visit_count = np.zeros(N_ACTIONS, dtype=np.float32)
     node.value_sum = np.zeros(N_ACTIONS, dtype=np.float32)
     node.legal_mask_np = mask
+    node.legal_idx = np.flatnonzero(mask)
     node.expanded = True
+    _apply_top_k(node, top_k)
     return value
 
 
@@ -223,6 +268,7 @@ def run_mcts(
         c_puct: float = 1.5,
         dirichlet_alpha: float = 0.3,
         dirichlet_eps: float = 0.0,  # 0 during play, 0.25 during self-play
+        top_k: int = 0,  # 0 = unrestricted (original behaviour)
 ) -> tuple[np.ndarray, AZNode, GameState]:
     """
     Run AZ-MCTS from root_state.
@@ -240,7 +286,8 @@ def run_mcts(
     if root.is_terminal:
         return np.zeros(N_ACTIONS, dtype=np.float32), root, root_state
 
-    # Initial expansion of root
+    # Root is expanded WITHOUT pruning so Dirichlet noise below is applied over
+    # the full legal set and can promote an action into the surviving top_k.
     _expand_node(root, evaluator)
 
     # Mix in Dirichlet noise on root priors (self-play only)
@@ -249,6 +296,8 @@ def run_mcts(
         noise = np.random.dirichlet([dirichlet_alpha] * len(legal_indices))
         for i, a in enumerate(legal_indices):
             root.priors[a] = (1 - dirichlet_eps) * root.priors[a] + dirichlet_eps * noise[i]
+
+    _apply_top_k(root, top_k)
 
     for _ in range(n_simulations):
         node = root

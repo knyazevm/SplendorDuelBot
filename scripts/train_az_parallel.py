@@ -36,6 +36,12 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
+def _parse_hidden_sizes(s: str) -> tuple[int, ...]:
+    """'512,512,512,512' -> (512, 512, 512, 512). '256,128' reproduces the
+    original (legacy) trunk size."""
+    return tuple(int(x) for x in s.split(","))
+
+
 # ── Worker function (top-level for pickling) ──────────────────────────────────
 
 def _worker_run_games(args_tuple):
@@ -58,16 +64,11 @@ def _worker_run_games(args_tuple):
     stdlib_random.seed(seed)
     torch.manual_seed(seed)
 
-    from splendor_duel.agents.ppo.network import SplendorNetwork
+    from splendor_duel.agents.ppo.network import load_network_from_checkpoint
     from splendor_duel.agents.az.self_play import generate_batch
 
-    # Load network
-    network = SplendorNetwork()
-    data = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    if "network" in data:
-        network.load_state_dict(data["network"])
-    else:
-        network.load_state_dict(data)
+    # Load network (sized to match whatever architecture is in the checkpoint)
+    network, _ = load_network_from_checkpoint(checkpoint_path, device="cpu")
     network.eval()
 
     # Generate games
@@ -127,11 +128,20 @@ def train_parallel(args):
         eval_every=args.eval_every,
         eval_games=args.eval_games_during_train,
         eval_opponents=args.eval_vs_during_train.split(",") if args.eval_vs_during_train else ["greedy"],
+        hidden_sizes=args.hidden_sizes,
     )
 
     if args.resume:
         trainer.load(args.resume)
-        print(f"Resumed from {args.resume} (iter {trainer.total_iterations})")
+        # load() restores the optimizer's state_dict, which includes the lr
+        # that was active when the checkpoint was saved — override it so
+        # --lr actually takes effect on resume.
+        for group in trainer.optimizer.param_groups:
+            group["lr"] = args.lr
+        buffer_restored = trainer.load_buffer_near(args.resume)
+        buffer_msg = (f"buffer restored ({len(trainer.buffer)} examples)" if buffer_restored
+                      else "no replay_buffer.pkl found next to it — starting with empty buffer")
+        print(f"Resumed from {args.resume} (iter {trainer.total_iterations}), lr set to {args.lr}, {buffer_msg}")
 
     print(f"Training AlphaZero (parallel, {args.workers} workers)")
     print(f"  Iterations: {args.iterations}")
@@ -139,6 +149,8 @@ def train_parallel(args):
     print(f"  MCTS sims/move: {args.simulations}")
     print(f"  Epochs/iter: {args.epochs_per_iter}")
     print(f"  Buffer: {args.buffer_size}, Batch: {args.batch_size}")
+    print(f"  Hidden sizes (requested): {args.hidden_sizes} "
+          f"— actual network: {trainer.network.hidden_sizes}")
     if args.init:
         print(f"  Warm-start: {args.init}")
     print()
@@ -229,13 +241,15 @@ def train_parallel(args):
             if args.save_interval > 0 and (it + 1) % args.save_interval == 0:
                 path = f"{args.save_dir}/az_{trainer.total_iterations}.pt"
                 trainer.save(path)
-                print(f"  → Saved {path}")
+                trainer.buffer.save(f"{args.save_dir}/replay_buffer.pkl")
+                print(f"  → Saved {path} (+ buffer, {len(trainer.buffer)} examples)")
 
             # Evaluate
             if args.eval_every > 0 and (it + 1) % args.eval_every == 0:
                 trainer._run_evaluation()
 
         trainer.save(f"{args.save_dir}/az_final.pt")
+        trainer.buffer.save(f"{args.save_dir}/replay_buffer.pkl")
         print(f"\nTraining complete: {trainer.total_iterations} iterations, "
               f"{trainer.total_games} games in {time.time()-t_start:.0f}s")
     finally:
@@ -271,6 +285,10 @@ def main():
     p.add_argument("--value-coeff", type=float, default=1.0)
     p.add_argument("--buffer-size", type=int, default=50_000)
     p.add_argument("--batch-size", type=int, default=256)
+    p.add_argument("--hidden-sizes", type=_parse_hidden_sizes, default="512,512,512,512",
+                   help="Comma-separated trunk layer widths for a fresh network "
+                        "(ignored when --resume/--init load a checkpoint — its own "
+                        "architecture wins). Use '256,128' for the original/legacy size.")
 
     # Logging
     p.add_argument("--save-interval", type=int, default=5)
