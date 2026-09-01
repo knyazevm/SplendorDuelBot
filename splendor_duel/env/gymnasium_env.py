@@ -226,8 +226,8 @@ class SplendorDuelEnv(gym.Env):
         winner = self._state.winner
         if self.self_play:
             # In self-play, reward from perspective of the player who
-            # made the last move (previous active player)
-            last_player = 1 - self._state.current_player
+            # made the last move (current active player)
+            last_player = self._state.current_player
             reward = 1.0 if winner == last_player else -1.0
         else:
             reward = 1.0 if winner == self._my_player else -1.0

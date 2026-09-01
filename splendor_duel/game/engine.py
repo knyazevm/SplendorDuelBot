@@ -345,8 +345,8 @@ def _apply_choose_wildcard(s: GameState, action: EffectChooseWildcard) -> GameSt
     colour, count = bonus_info
     s.active.add_card(card, wildcard_color=colour, wildcard_count=count)
 
-    # Wildcards don't have additional abilities — advance
-    return _advance_after_effect(s)
+    # Handle the ability (if any)
+    return _handle_card_ability(s, card)
 
 
 def _apply_take_same_gem(s: GameState, action: EffectTakeSameGem) -> GameState:
@@ -420,7 +420,7 @@ def _apply_discard(s: GameState, action: DiscardToken) -> GameState:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _handle_card_ability(s: GameState, card: Card) -> GameState:
-    """After adding a non-wildcard card, handle its ability."""
+    """After adding a non-wildcard card, handle its ability (as well as wildcards after handling wildness)."""
     ability = card.ability
 
     if ability is None:
