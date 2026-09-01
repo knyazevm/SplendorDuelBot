@@ -331,14 +331,9 @@ class GreedyAgent(BaseAgent):
     def _wildcard_value(
             self, state: GameState, action: EffectChooseWildcard, gap: np.ndarray
     ) -> float:
-        """Value of placing wildcard on a target card (copying its bonus colour)."""
-        target_card = state.active.cards[action.target_card_index]
-        if target_card.gem_bonus is not None:
-            for i, v in enumerate(target_card.gem_bonus):
-                if v > 0:
-                    # Prefer colours where we have the biggest gap
-                    return float(gap[i]) * v
-        return 0.0
+        """Value of assigning the wildcard to this colour."""
+        # Prefer the colour where we have the biggest gap.
+        return float(gap[action.colour])
 
     # ── ROYAL phase ───────────────────────────────────────────────────────
 

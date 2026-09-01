@@ -17,8 +17,8 @@ import numpy as np
 
 from .actions import (
     Action, BuyCard, ChooseRoyal, DiscardToken,
-    EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
-    EffectTakeSameGem, Phase, ProceedToMain, RefillBoard,
+    EffectChooseGold, EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
+    EffectTakeSameGem, PassTurn, Phase, ProceedToMain, RefillBoard,
     ReserveCard, TakeTokens, UseScroll,
 )
 from .board import Board
@@ -26,6 +26,7 @@ from .card import Card
 from .constants import (
     ABILITY_EXTRA_TURN, ABILITY_TAKE_OPPONENT_GEM,
     ABILITY_TAKE_SAME_GEM, ABILITY_TAKE_SCROLL,
+    BOARD_SIZE, EFFECT_CHOOSE_GOLD, EFFECT_CHOOSE_WILDCARD,
     GEM_NAMES, Gem, MAX_TOKENS, N_GEMS,
 )
 from .player import PlayerState
@@ -77,6 +78,8 @@ class GameEngine:
         if isinstance(action, ProceedToMain):
             s.phase = Phase.MAIN
             return s
+        if isinstance(action, PassTurn):
+            return _apply_pass(s)
         if isinstance(action, TakeTokens):
             return _apply_take_tokens(s, action)
         if isinstance(action, ReserveCard):
@@ -85,6 +88,8 @@ class GameEngine:
             return _apply_buy(s, action)
         if isinstance(action, EffectChooseWildcard):
             return _apply_choose_wildcard(s, action)
+        if isinstance(action, EffectChooseGold):
+            return _apply_choose_gold(s, action)
         if isinstance(action, EffectTakeSameGem):
             return _apply_take_same_gem(s, action)
         if isinstance(action, EffectTakeOpponentGem):
@@ -128,11 +133,12 @@ def _get_optional_actions(state: GameState) -> list[Action]:
     if _has_any_main_action(state):
         actions.append(ProceedToMain())
 
-    # Edge case: if nothing at all is possible (empty board, empty bag,
-    # no scrolls, no main actions) — shouldn't happen in normal play.
-    # Fall through to ProceedToMain to avoid deadlock.
+    # Nothing at all is possible: no scrolls, empty bag, and no main action.
+    # Reachable — privileges can strip the last non-gold tokens off the board
+    # while the reserve is full and nothing is affordable.  Passing is the only
+    # way out; it is offered ONLY here, when the list is otherwise empty.
     if not actions:
-        actions.append(ProceedToMain())
+        actions.append(PassTurn())
 
     return actions
 
@@ -168,6 +174,13 @@ def _get_main_actions(state: GameState) -> list[Action]:
         if _can_buy_card(player, card):
             actions.append(BuyCard(source='reserve', level=card.level, index=idx))
 
+    # Defensive: MAIN is only entered when _has_any_main_action() said yes, so
+    # this should be unreachable.  The two can disagree in one corner (it
+    # reports True on can_reserve + gold without checking a card exists to
+    # reserve), and get_legal_actions() must never return an empty list.
+    if not actions:
+        actions.append(PassTurn())
+
     return actions
 
 
@@ -176,17 +189,24 @@ def _get_effect_actions(state: GameState) -> list[Action]:
     effect = state.pending_effect
     player = state.active
 
-    if effect == 'choose_wildcard':
-        actions: list[Action] = []
-        seen: set[tuple[int, int]] = set()
-        for idx, card in enumerate(player.cards):
-            bonus_info = _card_bonus_info(card, player)
-            if bonus_info is not None:
-                key = bonus_info  # (colour, count)
-                if key not in seen:
-                    seen.add(key)
-                    actions.append(EffectChooseWildcard(target_card_index=idx))
+    if effect == EFFECT_CHOOSE_WILDCARD:
+        # One choice per bonus colour already in the tableau.  bonuses[c] > 0
+        # holds exactly when some owned card grants colour c, so this is the
+        # same set the per-card scan produced, deduplicated by construction.
+        actions: list[Action] = [
+            EffectChooseWildcard(colour=c)
+            for c in range(N_GEMS)
+            if player.bonuses[c] > 0
+        ]
         return actions if actions else [EffectSkip()]
+
+    if effect == EFFECT_CHOOSE_GOLD:
+        # Reserve is only legal with gold on the board, and this phase is only
+        # entered with more than one, so the list is never empty.
+        return [
+            EffectChooseGold(position=pos)
+            for pos in _gold_positions(state)
+        ]
 
     if effect == ABILITY_TAKE_SAME_GEM:
         card = state.pending_card
@@ -269,20 +289,28 @@ def _apply_take_tokens(s: GameState, action: TakeTokens) -> GameState:
     return _advance_after_main_no_buy(s)
 
 
-def _apply_reserve(s: GameState, action: ReserveCard) -> GameState:
-    """Take 1 gold from board + reserve 1 card."""
-    # Take gold token from board
-    gold_positions = [
-        (r, c) for r in range(5) for c in range(5)
+def _gold_positions(s: GameState) -> list[tuple[int, int]]:
+    """Board cells currently holding a gold token."""
+    return [
+        (r, c) for r in range(BOARD_SIZE) for c in range(BOARD_SIZE)
         if s.board.token_at(r, c) == Gem.GOLD
     ]
-    # Pick any gold (choice doesn't matter, they're identical)
-    s.board, _ = s.board.take_single(*gold_positions[0])
+
+
+def _take_gold_at(s: GameState, position: tuple[int, int]) -> GameState:
+    """Move one gold from the given board cell to the active player, ending the turn."""
+    s.board, gem = s.board.take_single(*position)
+    assert gem == Gem.GOLD, f"cell {position} holds {gem}, not gold"
     gold_vec = np.zeros(N_GEMS, dtype=np.int8)
     gold_vec[Gem.GOLD] = 1
     s.active.add_tokens(gold_vec)
+    return _advance_after_main_no_buy(s)
 
-    # Take card
+
+def _apply_reserve(s: GameState, action: ReserveCard) -> GameState:
+    """Reserve 1 card + take 1 gold from the board."""
+    # Card first, so the gold sub-decision below cannot leave a reserve
+    # half-applied if the player still has a choice to make.
     if action.source == 'pyramid':
         card = s.pyramid[action.level][action.index]
         s.active.reserved.append(card)
@@ -291,7 +319,26 @@ def _apply_reserve(s: GameState, action: ReserveCard) -> GameState:
         card = s.decks[action.level].pop(0)
         s.active.reserved.append(card)
 
-    return _advance_after_main_no_buy(s)
+    golds = _gold_positions(s)
+    assert golds, "reserve is only legal when the board has gold"
+
+    # WHICH gold is a real decision.  The tokens are interchangeable but the
+    # cells are not: vacating a gold changes no take-line today (gold and
+    # empty cells are equally non-takeable), yet it decides where the next
+    # refill drops its tokens, which changes the legal take-set roughly half
+    # the time.  Ask only when there is something to ask.
+    if len(golds) == 1:
+        return _take_gold_at(s, golds[0])
+
+    s.pending_card = None
+    s.pending_effect = EFFECT_CHOOSE_GOLD
+    s.phase = Phase.EFFECT
+    return s
+
+
+def _apply_choose_gold(s: GameState, action: EffectChooseGold) -> GameState:
+    """Complete a reserve by taking the chosen gold token."""
+    return _take_gold_at(s, action.position)
 
 
 def _apply_buy(s: GameState, action: BuyCard) -> GameState:
@@ -321,7 +368,7 @@ def _apply_buy(s: GameState, action: BuyCard) -> GameState:
     if card.is_wildcard:
         # Defer: need player to choose target card
         s.pending_card = card
-        s.pending_effect = 'choose_wildcard'
+        s.pending_effect = EFFECT_CHOOSE_WILDCARD
         s.phase = Phase.EFFECT
         return s
 
@@ -334,16 +381,14 @@ def _apply_buy(s: GameState, action: BuyCard) -> GameState:
 
 
 def _apply_choose_wildcard(s: GameState, action: EffectChooseWildcard) -> GameState:
-    """Resolve wildcard: place on target card, copy its bonus."""
+    """Resolve wildcard: assign its colour.  Always worth exactly 1 bonus."""
     card = s.pending_card
     assert card is not None and card.is_wildcard
+    assert s.active.bonuses[action.colour] > 0, (
+        f"No tableau card with a {GEM_NAMES[action.colour]} bonus"
+    )
 
-    target = s.active.cards[action.target_card_index]
-    bonus_info = _card_bonus_info(target, s.active)
-    assert bonus_info is not None, f"Target card {target.id} has no bonus"
-
-    colour, count = bonus_info
-    s.active.add_card(card, wildcard_color=colour, wildcard_count=count)
+    s.active.add_card(card, wildcard_color=action.colour, wildcard_count=1)
 
     # Handle the ability (if any)
     return _handle_card_ability(s, card)
@@ -367,6 +412,23 @@ def _apply_take_opponent_gem(s: GameState, action: EffectTakeOpponentGem) -> Gam
     s.opponent.remove_tokens(remove_vec)
     s.active.add_tokens(remove_vec)
     return _advance_after_effect(s)
+
+
+def _apply_pass(s: GameState) -> GameState:
+    """
+    End the turn without a main action.
+
+    Routed through the normal end-of-turn path so the 10-token limit is still
+    enforced, which is what guarantees this cannot loop forever: a stuck
+    player is always over the limit.  The board holds at most 3 gold and the
+    bag is empty, so the two players hold >= 22 tokens between them, and the
+    idle player discarded down to 10 at the end of their own turn — so the
+    excess is the active player's.  Passing therefore always returns tokens to
+    the bag, which makes RefillBoard legal again next turn.
+    """
+    s.pending_card = None
+    s.pending_effect = None
+    return _advance_after_royal(s)
 
 
 def _apply_choose_royal(s: GameState, action: ChooseRoyal) -> GameState:
@@ -487,7 +549,12 @@ def _advance_after_royal(s: GameState) -> GameState:
 def _advance_after_discard(s: GameState) -> GameState:
     """After discarding down to ≤ 10 tokens."""
     # ── Victory check ─────────────────────────────────────────────────────
+    # Only the active player can have gained anything this turn, so only they
+    # can have just won.  Record who it was: recomputing it later by scanning
+    # both players cannot distinguish a tie from a win, and cannot tell a
+    # winner-less terminal state from a bug.
     if s.active.check_victory() is not None:
+        s.winner = s.current_player
         s.phase = Phase.GAME_OVER
         return s
 
@@ -563,20 +630,3 @@ def _card_bonus_colour(card: Card, player: PlayerState) -> Optional[int]:
                 return i
     return None
 
-
-def _card_bonus_info(card: Card, player: PlayerState) -> Optional[tuple[int, int]]:
-    """
-    Return (colour, count) of a card's bonus, or None if no bonus.
-    For wildcard cards, returns the assigned bonus info.
-    """
-    if card.is_wildcard:
-        colour = player.wildcard_assignments.get(card.id)
-        if colour is None:
-            return None
-        # Wildcard always gives 1 of the assigned colour
-        return colour, 1
-    if card.gem_bonus is not None:
-        for i, v in enumerate(card.gem_bonus):
-            if v > 0:
-                return i, int(v)
-    return None

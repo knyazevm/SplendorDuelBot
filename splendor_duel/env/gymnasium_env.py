@@ -43,6 +43,27 @@ from .observation import OBS_SIZE, encode_state
 
 CARDS_PATH = "data/cards.json"
 
+# Hard ceiling on sub-actions inside ONE opponent turn.  A turn is bounded by
+# the phase machine (<= 3 scrolls, refill, one main action, effect, royal,
+# discards) and extra_turn chains are bounded by the finite decks, so a few
+# dozen is already generous; this only catches a phase that fails to advance.
+_OPPONENT_STEP_LIMIT = 1000
+
+
+def outcome_reward(winner: Optional[int], player: int) -> float:
+    """
+    Terminal reward for `player`, given the recorded winner.
+
+    Three-way on purpose.  `winner` is Optional[int], and every call site used
+    to branch two ways — `1.0 if winner == me else -1.0` — which folded a
+    winner-less game (None) into "loss" for BOTH players.  That breaks the
+    antisymmetry a value function has to satisfy, v(s, p) == -v(s, 1 - p), and
+    feeds the value head contradictory targets from one position.
+    """
+    if winner is None:
+        return 0.0
+    return 1.0 if winner == player else -1.0
+
 _OPPONENT_FACTORIES = {
     "random": lambda: RandomAgent(),
     "greedy": lambda: GreedyAgent(),
@@ -155,7 +176,7 @@ class SplendorDuelEnv(gym.Env):
                 info = self._make_info()
                 return obs, -1.0, True, False, info
             action = int(legal_indices[0])
-            penalty = -0.5
+            penalty = -10.0
         else:
             penalty = 0.0
 
@@ -184,7 +205,7 @@ class SplendorDuelEnv(gym.Env):
             obs = encode_state(self._state)
             reward = self._compute_reward() + penalty
             info = self._make_info()
-            return obs, reward, False, False, info
+            return obs, reward, False, self._truncated(), info
 
         # If it's still our turn (multi-phase: EFFECT, ROYAL, DISCARD),
         # return immediately for the next sub-action
@@ -192,7 +213,7 @@ class SplendorDuelEnv(gym.Env):
             obs = encode_state(self._state)
             reward = self._compute_reward() + penalty
             info = self._make_info()
-            return obs, reward, False, False, info
+            return obs, reward, False, self._truncated(), info
 
         # Opponent's turn — run until it's back to us (or game over)
         self._run_opponent()
@@ -201,39 +222,83 @@ class SplendorDuelEnv(gym.Env):
             obs, reward, done, trunc, info = self._terminal_step()
             return obs, reward + penalty, done, trunc, info
 
-        # Truncation check
-        truncated = (self.max_turns > 0 and self._state.turn > self.max_turns)
         obs = encode_state(self._state)
         reward = self._compute_reward() + penalty
         info = self._make_info()
-        return obs, reward, False, truncated, info
+        return obs, reward, False, self._truncated(), info
+
+    def _truncated(self) -> bool:
+        """
+        Has the game run past max_turns?
+
+        Applies on every non-terminal return path.  It used to be computed on
+        one of them only — the branch taken after the built-in opponent moves —
+        so `opponent="self"` never truncated at all and `max_turns` silently
+        did nothing in that mode.  Games are not provably finite (tokens cycle
+        board -> player -> bag -> board with nothing forcing progress), so the
+        cap has to be real.
+        """
+        return self.max_turns > 0 and self._state.turn > self.max_turns
 
     def _run_opponent(self):
-        """Run opponent agent until it's our turn or game over."""
-        for _ in range(200):  # safety limit
+        """
+        Run the opponent until control comes back to us, or the game ends.
+
+        Returning while it is still the opponent's turn is the one thing this
+        must never do: step() would then hand our policy an observation of the
+        OPPONENT's position and let it play that side, generating transitions
+        labelled with the wrong player.  Both former exits did exactly that,
+        silently — an empty action list, and running out of the 200-iteration
+        cap.  Neither is reachable now, so both are assertions instead.
+        """
+        for _ in range(_OPPONENT_STEP_LIMIT):
             if self._state.is_game_over:
-                break
+                return
             if self._state.current_player == self._my_player:
-                break
+                return
             actions = GameEngine.get_legal_actions(self._state)
-            if not actions:
-                break
+            # The engine always offers something — PassTurn is the last resort
+            # when nothing else is possible — so an empty list means the rules
+            # engine is broken, not that the opponent is stuck.
+            assert actions, (
+                f"engine returned no legal actions in phase "
+                f"{self._state.phase.name} for player "
+                f"{self._state.current_player}"
+            )
             action = self._opponent.choose_action(self._state, actions)
             self._state = GameEngine.apply_action(self._state, action)
 
+        raise RuntimeError(
+            f"opponent did not yield control within {_OPPONENT_STEP_LIMIT} "
+            f"sub-actions (phase={self._state.phase.name}, "
+            f"turn={self._state.turn}) — a single turn is bounded by the "
+            f"phase machine and finite decks, so this means a phase loop"
+        )
+
     def _terminal_step(self):
-        """Return final observation and reward."""
+        """
+        Final observation, reward, and the outcome for BOTH players.
+
+        The returned scalar is the reward of the player whose move ended the
+        game — the usual alternating-env convention.  In self-play that is
+        structurally ALWAYS +1: the engine sets GAME_OVER without advancing
+        `current_player`, so the mover is the winner by construction, and the
+        losing side's transitions would otherwise never see a negative reward
+        at all.  Callers that own both sides must therefore credit the loser
+        from `info["final_rewards"]` rather than summing the scalar.
+        """
         winner = self._state.winner
-        if self.self_play:
-            # In self-play, reward from perspective of the player who
-            # made the last move (current active player)
-            last_player = self._state.current_player
-            reward = 1.0 if winner == last_player else -1.0
-        else:
-            reward = 1.0 if winner == self._my_player else -1.0
+        final_rewards = {p: outcome_reward(winner, p) for p in (0, 1)}
+
+        perspective = (
+            self._state.current_player if self.self_play else self._my_player
+        )
+        reward = final_rewards[perspective]
+
         obs = encode_state(self._state)
         info = self._make_info()
         info["winner"] = winner
+        info["final_rewards"] = final_rewards
         return obs, reward, True, False, info
 
     def _compute_reward(self) -> float:

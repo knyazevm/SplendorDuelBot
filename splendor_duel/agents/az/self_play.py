@@ -25,7 +25,13 @@ from splendor_duel.game.state import GameState
 
 from .mcts_az import NetworkEvaluator, run_mcts
 
-MAX_GAME_TURNS = 250  # safety
+# Hard cap on MCTS decisions in one self-play game.  Deliberately far above a
+# real game (~150 decisions): games are not provably finite — tokens cycle
+# board -> player -> bag -> board with nothing forcing progress — so a cap is
+# needed, but it should only ever fire on a pathological loop.  A cap tight
+# enough to clip ordinary long games would feed the value head outcome-less
+# positions and teach it that stalling is safe.
+MAX_GAME_TURNS = 1000
 
 
 @dataclass

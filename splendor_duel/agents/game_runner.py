@@ -20,7 +20,7 @@ from .base_agent import BaseAgent
 @dataclass
 class GameResult:
     """Result of a single game."""
-    winner: int  # 0 or 1
+    winner: Optional[int]  # 0, 1, or None for a draw
     victory_type: str  # 'prestige_20', 'crowns_10', 'mono_X'
     turns: int
     steps: int
@@ -31,9 +31,13 @@ class GameResult:
     agent_names: tuple[str, str]
 
     def __repr__(self) -> str:
+        outcome = (
+            "draw" if self.winner is None
+            else f"Player {self.winner} ({self.agent_names[self.winner]}) wins"
+        )
         return (
             f"Game: {self.agent_names[0]} vs {self.agent_names[1]} → "
-            f"Player {self.winner} ({self.agent_names[self.winner]}) wins "
+            f"{outcome} "
             f"by {self.victory_type} | "
             f"scores={self.scores} crowns={self.crowns} "
             f"turns={self.turns} ({self.elapsed:.1f}s)"
@@ -108,8 +112,16 @@ def play_game(
             winner = 1
         victory_type = "timeout"
     else:
-        winner = state.winner if state.winner is not None else 0
-        victory_type = state.players[winner].check_victory() or "unknown"
+        winner = state.winner
+        if winner is None:
+            # A finished game with no winner is a draw, not a player-0 win.
+            # This used to read `state.winner if ... is not None else 0`, which
+            # fabricated a win for player 0 — and run_tournament.py flips seats
+            # with `1 - result.winner`, so the fabrication became a player-1
+            # win on the return leg.  Silently wrong win-rates, no error.
+            victory_type = "draw"
+        else:
+            victory_type = state.players[winner].check_victory() or "unknown"
 
     return GameResult(
         winner=winner,

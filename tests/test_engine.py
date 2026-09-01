@@ -9,7 +9,7 @@ import pytest
 from splendor_duel.game.actions import (
     BuyCard, ChooseRoyal, DiscardToken, EffectChooseWildcard,
     EffectSkip, EffectTakeOpponentGem, EffectTakeSameGem,
-    Phase, ProceedToMain, RefillBoard, ReserveCard,
+    PassTurn, Phase, ProceedToMain, RefillBoard, ReserveCard,
     TakeTokens, UseScroll,
 )
 from splendor_duel.game.board import Board
@@ -17,11 +17,13 @@ from splendor_duel.game.card import Card, RoyalCard, load_cards
 from splendor_duel.game.constants import (
     ABILITY_EXTRA_TURN, ABILITY_TAKE_OPPONENT_GEM,
     ABILITY_TAKE_SAME_GEM, ABILITY_TAKE_SCROLL,
-    GEM_NAMES, Gem, MAX_TOKENS, N_GEMS,
+    EMPTY, GEM_NAMES, Gem, MAX_RESERVED, MAX_TOKENS, N_GEMS,
 )
 from splendor_duel.game.engine import GameEngine
 from splendor_duel.game.player import PlayerState
 from splendor_duel.game.state import GameState
+
+CARDS_PATH = "data/cards.json"
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -469,12 +471,13 @@ class TestWildcard:
         assert all(isinstance(a, EffectChooseWildcard) for a in actions)
 
         # Choose the base card (index 0)
-        s3 = GameEngine.apply_action(s2, EffectChooseWildcard(target_card_index=0))
+        s3 = GameEngine.apply_action(
+            s2, EffectChooseWildcard(colour=int(Gem.GREEN)))
         assert s3.players[0].bonuses[Gem.GREEN] == 2  # 1 from base + 1 from wildcard
         assert s3.players[0].points == 2
         assert s3.current_player == 1  # turn ended
 
-    def test_wildcard_copies_double_bonus(self):
+    def test_wildcard_is_worth_one_regardless_of_target(self):
         s = _minimal_state(phase=Phase.MAIN, current_player=0)
         wc = _make_card("WC_0", 1, cost_white=0, is_wildcard=True)
         s.pyramid[1] = [wc]
@@ -484,13 +487,93 @@ class TestWildcard:
         s2 = GameEngine.apply_action(s, BuyCard(
             source='pyramid', level=1, index=0
         ))
-        s3 = GameEngine.apply_action(s2, EffectChooseWildcard(target_card_index=0))
-        assert s3.players[0].bonuses[Gem.BLACK] == 4  # 2 from base + 2 from wildcard
+        s3 = GameEngine.apply_action(
+            s2, EffectChooseWildcard(colour=int(Gem.BLACK)))
+        # The wildcard grants 1 bonus, not a copy of the target's count.
+        assert s3.players[0].bonuses[Gem.BLACK] == 3  # 2 from base + 1 from wildcard
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ROYAL CARDS
 # ══════════════════════════════════════════════════════════════════════════════
+
+class TestPassTurn:
+    """
+    PassTurn exists only because the engine could otherwise return zero legal
+    actions.  It must never be offered alongside a real move.
+    """
+
+    def _stuck_state(self):
+        """
+        Board holds only gold, bag empty, reserve full, nothing affordable.
+        Reached in real play when privileges strip the last non-gold tokens.
+        """
+        s = GameState.new_game(CARDS_PATH)
+        grid = np.full((5, 5), EMPTY, dtype=np.int8)
+        grid[1, 3] = grid[2, 2] = grid[3, 2] = int(Gem.GOLD)
+        s.board = Board(grid)
+        s.bag = {name: 0 for name in GEM_NAMES}
+        p = s.active
+        p.scrolls = 0
+        p.tokens = np.array([3, 0, 3, 3, 3, 0, 0], dtype=np.int8)  # 12: over the limit
+        # Reserve full (so can_reserve is False) with cards it cannot afford:
+        # 8 white against 3 white and no gold.
+        p.reserved = [_make_card(f"EXP_{i}", 3, cost_white=8)
+                      for i in range(MAX_RESERVED)]
+        s.pyramid = {1: [], 2: [], 3: []}                          # nothing to buy
+        s.phase = Phase.OPTIONAL
+        return s
+
+    def test_offered_when_nothing_else_is_possible(self):
+        s = self._stuck_state()
+        assert GameEngine.get_legal_actions(s) == [PassTurn()]
+
+    def test_not_offered_when_any_other_action_exists(self):
+        """Must move if you can — one takeable token is enough to remove it."""
+        s = self._stuck_state()
+        grid = np.array(s.board.grid, dtype=np.int8)
+        grid[0, 0] = int(Gem.RED)
+        s.board = Board(grid)
+        actions = GameEngine.get_legal_actions(s)
+        assert actions, "expected at least ProceedToMain"
+        assert PassTurn() not in actions
+        # ...and not in MAIN either, where a take is now available
+        assert PassTurn() not in GameEngine.get_legal_actions(
+            GameEngine.apply_action(s, ProceedToMain()))
+
+    def test_never_offered_with_a_scroll_in_hand(self):
+        s = self._stuck_state()
+        s.active.scrolls = 1
+        s.scrolls_center = 0
+        grid = np.array(s.board.grid, dtype=np.int8)
+        grid[4, 4] = int(Gem.BLUE)  # a scroll target
+        s.board = Board(grid)
+        assert PassTurn() not in GameEngine.get_legal_actions(s)
+
+    def test_enforces_token_limit_and_ends_turn(self):
+        s = self._stuck_state()
+        me = s.current_player
+        s2 = GameEngine.apply_action(s, PassTurn())
+        # Over the limit, so the pass routes through DISCARD before ending.
+        assert s2.phase == Phase.DISCARD and s2.current_player == me
+        while s2.phase == Phase.DISCARD:
+            s2 = GameEngine.apply_action(s2, GameEngine.get_legal_actions(s2)[0])
+        assert s2.current_player == 1 - me, "turn should have passed"
+        assert int(s2.players[me].tokens.sum()) == MAX_TOKENS
+
+    def test_pass_breaks_the_deadlock(self):
+        """
+        The discard hands tokens back to the bag, so RefillBoard becomes legal
+        again — two players cannot pass at each other forever.
+        """
+        s = self._stuck_state()
+        assert sum(s.bag.values()) == 0
+        s2 = GameEngine.apply_action(s, PassTurn())
+        while s2.phase == Phase.DISCARD:
+            s2 = GameEngine.apply_action(s2, GameEngine.get_legal_actions(s2)[0])
+        assert sum(s2.bag.values()) > 0
+        assert RefillBoard() in GameEngine.get_legal_actions(s2)
+
 
 class TestRoyalCards:
 

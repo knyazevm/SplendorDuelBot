@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from splendor_duel.game.actions import (
     Action, BuyCard, ChooseRoyal, DiscardToken,
-    EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
+    EffectChooseGold, EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem, PassTurn,
     EffectTakeSameGem, ProceedToMain, RefillBoard,
     ReserveCard, TakeTokens, UseScroll,
 )
@@ -99,6 +99,8 @@ def serialize_action(action: Action, state: GameState) -> dict:
         return {"type": "RefillBoard", "desc": "Refill board"}
     if isinstance(action, ProceedToMain):
         return {"type": "ProceedToMain", "desc": "Proceed →"}
+    if isinstance(action, PassTurn):
+        return {"type": "PassTurn", "desc": "Pass (no legal move)"}
     if isinstance(action, EffectTakeSameGem):
         gem = state.board.token_at(*action.position)
         gn = GEM_NAMES[gem] if gem is not None else "?"
@@ -108,10 +110,14 @@ def serialize_action(action: Action, state: GameState) -> dict:
         return {"type": "EffectTakeOpponentGem", "gem": GEM_NAMES[action.gem],
                 "gem_index": action.gem, "desc": f"Steal {GEM_NAMES[action.gem]}"}
     if isinstance(action, EffectChooseWildcard):
-        target = state.active.cards[action.target_card_index]
+        gn = GEM_NAMES[action.colour]
         return {"type": "EffectChooseWildcard",
-                "target_card_index": action.target_card_index,
-                "target_card_id": target.id, "desc": f"Wildcard → {target.id}"}
+                "colour": gn, "colour_index": action.colour,
+                "desc": f"Wildcard → {gn}"}
+    if isinstance(action, EffectChooseGold):
+        r, c = action.position
+        return {"type": "EffectChooseGold", "position": [r, c],
+                "desc": f"Take gold from ({r},{c})"}
     if isinstance(action, EffectSkip):
         return {"type": "EffectSkip", "desc": "Skip (no targets)"}
     if isinstance(action, ChooseRoyal):

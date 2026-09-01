@@ -268,14 +268,9 @@ class GeminiGreedyAgentV2(BaseAgent):
             player = state.active
 
             def wc_score(a: EffectChooseWildcard):
-                target_card = player.cards[a.target_card_index]
-                if target_card.gem_bonus is None: return 0
-                score = 0
-                for i, v in enumerate(target_card.gem_bonus):
-                    if v > 0:
-                        # Pick color we have the most points in to rush mono-color victory
-                        score += sum(c.points for c in player.cards if c.gem_bonus and c.gem_bonus[i] > 0)
-                return score
+                # Pick color we have the most points in to rush mono-color victory
+                return sum(c.points for c in player.cards
+                           if c.gem_bonus and c.gem_bonus[a.colour] > 0)
 
             return max(wc, key=wc_score)
 

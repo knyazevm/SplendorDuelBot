@@ -507,16 +507,7 @@ class GreedyByChatGPT(BaseAgent):
             action: EffectChooseWildcard,
             missing: np.ndarray,
     ) -> float:
-        try:
-            target_card = state.active.cards[action.target_card_index]
-        except Exception:
-            return 0.0
-
-        colour = self._bonus_colour(target_card)
-        if colour is None:
-            return 0.0
-
-        return float(missing[colour]) + 0.25
+        return float(missing[action.colour]) + 0.25
 
     # ---------------------------------------------------------------------
     # ROYAL PHASE

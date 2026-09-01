@@ -27,6 +27,7 @@ class GameState:
         'board', 'bag', 'pyramid', 'decks', 'royal_cards',
         'scrolls_center', 'players', 'current_player', 'phase',
         'turn', 'pending_effect', 'pending_card', 'extra_turn_flag',
+        'winner',
     )
 
     def __init__(
@@ -44,6 +45,7 @@ class GameState:
             pending_effect: Optional[str] = None,
             pending_card: Optional[Card] = None,
             extra_turn_flag: bool = False,
+            winner: Optional[int] = None,
     ) -> None:
         self.board = board
         self.bag = bag
@@ -58,6 +60,8 @@ class GameState:
         self.pending_effect = pending_effect
         self.pending_card = pending_card
         self.extra_turn_flag = extra_turn_flag
+        # Recorded by the engine when it sets GAME_OVER, never recomputed.
+        self.winner = winner
 
     # ── Setup ─────────────────────────────────────────────────────────────────
 
@@ -135,6 +139,7 @@ class GameState:
             pending_effect=self.pending_effect,
             pending_card=self.pending_card,
             extra_turn_flag=self.extra_turn_flag,
+            winner=self.winner,
         )
 
     # ── Accessors ─────────────────────────────────────────────────────────────
@@ -153,15 +158,16 @@ class GameState:
     def is_game_over(self) -> bool:
         return self.phase == Phase.GAME_OVER
 
-    @property
-    def winner(self) -> Optional[int]:
-        """Return index of winning player, or None."""
-        if not self.is_game_over:
-            return None
-        for i, p in enumerate(self.players):
-            if p.check_victory() is not None:
-                return i
-        return None
+    # `winner` is a plain attribute, set once by the engine at GAME_OVER — not
+    # a property that re-derives the answer on every read.  It used to scan the
+    # players in index order and return the first one satisfying a victory
+    # condition, so a tie resolved as "player 0 wins", and any terminal state
+    # reached without a victory condition silently reported None.  Callers then
+    # had to guess what None meant, and mostly guessed wrong: it read as a loss
+    # for whoever asked, or as a win for player 0.
+    #
+    # None now means exactly one thing — the game ended with no winner — and it
+    # can only be produced deliberately.
 
     # ── Pyramid helpers ───────────────────────────────────────────────────────
 

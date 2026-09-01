@@ -246,9 +246,11 @@ class GeminiGreedyAgent(BaseAgent):
         wc = [a for a in actions if isinstance(a, EffectChooseWildcard)]
         if wc:
             # Pick wildcard color based on our strongest color path to 10 points
-            if hasattr(state.active, 'points_by_color'):
-                return max(wc, key=lambda a: state.active.points_by_color.get(a.target_card_index, 0))
-            return wc[0]
+            player = state.active
+            return max(wc, key=lambda a: sum(
+                c.points for c in player.cards
+                if c.gem_bonus and c.gem_bonus[a.colour] > 0
+            ))
 
         return self._rng.choice(actions)
 

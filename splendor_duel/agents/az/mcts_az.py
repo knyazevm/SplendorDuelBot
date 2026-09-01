@@ -170,7 +170,7 @@ def _select_child_puct(
     """PUCT selection: argmax_a [ Q(s,a) + c_puct * P(s,a) * sqrt(sum N) / (1 + N(s,a)) ]
 
     Scores only the legal actions rather than all N_ACTIONS and masking after,
-    which avoids allocating several 265-wide temporaries per simulation.
+    which avoids allocating several N_ACTIONS-wide temporaries per simulation.
     """
     idx = node.legal_idx
     if idx.size == 0:

@@ -49,6 +49,19 @@ class ProceedToMain:
     pass
 
 
+@dataclass(frozen=True)
+class PassTurn:
+    """
+    End the turn without performing a main action.
+
+    Legal ONLY when the player has no other action at all — you must move if
+    you can.  The official rules do not cover this position, but it is
+    reachable: privileges can strip the last non-gold tokens off the board
+    while the bag is empty, the reserve is full and nothing is affordable.
+    """
+    pass
+
+
 # ── Main-phase actions ────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -89,8 +102,32 @@ class EffectTakeOpponentGem:
 
 @dataclass(frozen=True)
 class EffectChooseWildcard:
-    """Place wildcard on an existing card to copy its bonus colour & count."""
-    target_card_index: int  # index into player.cards (must have bonus)
+    """
+    Assign the wildcard's bonus colour, which must be a colour already in
+    the tableau.  The wildcard is always worth exactly 1 bonus of that
+    colour, regardless of the target card's own bonus count.
+
+    The action names the colour rather than a target card: the colour is all
+    the engine needs, and two tableau cards of the same colour are the same
+    decision.  Keying on the tableau index instead made the action space
+    unbounded (a tableau can exceed 25 cards) and gave the network a slot
+    whose meaning shifted with purchase order.
+    """
+    colour: int  # Gem index of the chosen bonus colour
+
+
+@dataclass(frozen=True)
+class EffectChooseGold:
+    """
+    Pick WHICH gold token to take when reserving a card.
+
+    The tokens are interchangeable; the board cells they vacate are not.
+    Vacating a gold changes no take-line immediately — a gold cell and an
+    empty cell are equally non-takeable — but it decides where the next
+    refill drops its tokens, which changes the legal take-set about half the
+    time.  Only asked when the board holds more than one gold.
+    """
+    position: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -118,10 +155,10 @@ class DiscardToken:
 # ── Type alias for convenience ────────────────────────────────────────────────
 
 Action = (
-        UseScroll | RefillBoard | ProceedToMain
+        UseScroll | RefillBoard | ProceedToMain | PassTurn
         | TakeTokens | ReserveCard | BuyCard
         | EffectTakeSameGem | EffectTakeOpponentGem
-        | EffectChooseWildcard | EffectSkip
+        | EffectChooseWildcard | EffectChooseGold | EffectSkip
         | ChooseRoyal
         | DiscardToken
 )

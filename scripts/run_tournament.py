@@ -52,7 +52,8 @@ def run_matchup(
             result = play_game(b, a, cards_path)
             # Remap winner index back to original agent perspective
             result = GameResult(
-                winner=1 - result.winner,
+                # None (draw) has no mirror image; only a real seat flips.
+                winner=None if result.winner is None else 1 - result.winner,
                 victory_type=result.victory_type,
                 turns=result.turns,
                 steps=result.steps,

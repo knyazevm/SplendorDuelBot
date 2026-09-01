@@ -149,7 +149,7 @@ from splendor_duel.env import SplendorDuelEnv
 # Против Greedy
 env = SplendorDuelEnv(opponent="greedy")
 obs, info = env.reset(seed=42)
-mask = info["legal_mask"]  # bool[265]
+mask = info["legal_mask"]  # bool[278]
 
 # Выбрать действие (только где mask==True)
 action = np.random.choice(np.where(mask)[0])

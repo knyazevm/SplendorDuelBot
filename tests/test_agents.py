@@ -94,8 +94,16 @@ class TestRandomAgent:
             c1 = a1.choose_action(state1, actions1)
             c2 = a2.choose_action(state2, actions2)
             assert c1 == c2
+            # RefillBoard draws from the bag via the GLOBAL random stream, so
+            # advancing the two games one after another off that single stream
+            # would hand them different boards.  Re-seed symmetrically: this
+            # test is about the agent being deterministic, not the engine.
+            step_seed = random.randrange(2 ** 31)
+            random.seed(step_seed)
             state1 = GameEngine.apply_action(state1, c1)
+            random.seed(step_seed)
             state2 = GameEngine.apply_action(state2, c2)
+            assert state1.board == state2.board
 
 
 # ══════════════════════════════════════════════════════════════════════════════

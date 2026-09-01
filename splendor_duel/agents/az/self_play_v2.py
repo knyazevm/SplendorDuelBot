@@ -44,8 +44,9 @@ from splendor_duel.game.state import GameState
 from .mcts_az import NetworkEvaluator, run_mcts, _auto_resolve_trivial
 from .self_play import TrainingExample
 
-# A game is ~150 phase-decisions; this only catches pathological loops.
-MAX_GAME_DECISIONS = 400
+# A game is ~150 phase-decisions; this only catches pathological loops, so it
+# sits far above any real game.  See MAX_GAME_TURNS in self_play.py.
+MAX_GAME_DECISIONS = 1000
 
 
 def determinize(state: GameState, rng: random.Random) -> GameState:

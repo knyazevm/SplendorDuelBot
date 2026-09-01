@@ -13,8 +13,8 @@ import numpy as np
 
 from splendor_duel.game.actions import (
     Action, BuyCard, ChooseRoyal, DiscardToken,
-    EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
-    EffectTakeSameGem, ProceedToMain, RefillBoard,
+    EffectChooseGold, EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
+    EffectTakeSameGem, PassTurn, ProceedToMain, RefillBoard,
     ReserveCard, TakeTokens, UseScroll,
 )
 from splendor_duel.game.constants import (
@@ -46,7 +46,11 @@ _N_BUY_RESERVE = MAX_RESERVED  # 3
 # Board cells for scroll / effect
 _N_CELLS = BOARD_SIZE * BOARD_SIZE  # 25
 
-_MAX_WILDCARD_TARGETS = 20
+# A wildcard choice is a bonus COLOUR, not a tableau position: a tableau is
+# unbounded (26+ cards observed in random play) while the colour space is not.
+# Sized on N_GEMS rather than the 5 colours that actually carry bonuses, so a
+# pearl-bonus card in cards.json could not silently overflow the next block.
+_N_WILDCARD = N_GEMS  # 7
 _N_ROYAL = 4
 _N_OPP_GEM = N_GEMS - 1  # 6 (exclude gold)
 
@@ -59,12 +63,14 @@ _N_OPP_GEM = N_GEMS - 1  # 6 (exclude gold)
 # [175        .. 200)  UseScroll (25)
 # [200        .. 225)  EffectTakeSameGem (25)
 # [225        .. 231)  EffectTakeOpponentGem (6)
-# [231        .. 251)  EffectChooseWildcard (20)
-# [251        .. 255)  ChooseRoyal (4)
-# [255        .. 262)  DiscardToken (7)
-# [262]               RefillBoard
-# [263]               ProceedToMain
-# [264]               EffectSkip
+# [231        .. 238)  EffectChooseWildcard (7 colours)
+# [238        .. 263)  EffectChooseGold (25 board cells)
+# [263        .. 267)  ChooseRoyal (4)
+# [267        .. 274)  DiscardToken (7)
+# [274]               RefillBoard
+# [275]               ProceedToMain
+# [276]               EffectSkip
+# [277]               PassTurn
 
 OFF_TAKE = 0
 OFF_BUY_PYR = OFF_TAKE + _N_TAKE
@@ -75,12 +81,14 @@ OFF_SCROLL = OFF_RES_DECK + _N_RESERVE_DECK
 OFF_EFFECT_SAME = OFF_SCROLL + _N_CELLS
 OFF_EFFECT_OPP = OFF_EFFECT_SAME + _N_CELLS
 OFF_EFFECT_WC = OFF_EFFECT_OPP + _N_OPP_GEM
-OFF_ROYAL = OFF_EFFECT_WC + _MAX_WILDCARD_TARGETS
+OFF_EFFECT_GOLD = OFF_EFFECT_WC + _N_WILDCARD
+OFF_ROYAL = OFF_EFFECT_GOLD + _N_CELLS
 OFF_DISCARD = OFF_ROYAL + _N_ROYAL
 OFF_REFILL = OFF_DISCARD + N_GEMS
 OFF_PROCEED = OFF_REFILL + 1
 OFF_SKIP = OFF_PROCEED + 1
-N_ACTIONS = OFF_SKIP + 1  # 265
+OFF_PASS = OFF_SKIP + 1
+N_ACTIONS = OFF_PASS + 1  # 278
 
 
 def _cell_idx(r: int, c: int) -> int:
@@ -94,40 +102,65 @@ def _gem_to_opp_idx(gem: int) -> int:
     return gem
 
 
+def _at(base: int, offset: int, width: int, what: str) -> int:
+    """
+    Place `offset` inside the block [base, base + width).
+
+    Every encoder goes through this.  Without it an out-of-range offset does
+    not raise — it lands in the NEXT block and decodes as a different action
+    type entirely, which is how EffectChooseWildcard used to turn into
+    ChooseRoyal on tableaus of 20+ cards.
+    """
+    assert 0 <= offset < width, (
+        f"{what}: offset {offset} outside block of width {width}"
+    )
+    return base + offset
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def action_to_index(action: Action) -> int:
     """Convert a game Action to a fixed action index."""
     if isinstance(action, TakeTokens):
-        return OFF_TAKE + _SEG_TO_IDX[action.positions]
+        return _at(OFF_TAKE, _SEG_TO_IDX[action.positions], _N_TAKE, 'TakeTokens')
 
     if isinstance(action, BuyCard):
         if action.source == 'pyramid':
-            return OFF_BUY_PYR + _PYRAMID_TO_IDX[(action.level, action.index)]
-        return OFF_BUY_RES + action.index
+            return _at(OFF_BUY_PYR, _PYRAMID_TO_IDX[(action.level, action.index)],
+                       _N_PYRAMID, 'BuyCard/pyramid')
+        return _at(OFF_BUY_RES, action.index, _N_BUY_RESERVE, 'BuyCard/reserve')
 
     if isinstance(action, ReserveCard):
         if action.source == 'pyramid':
-            return OFF_RES_PYR + _PYRAMID_TO_IDX[(action.level, action.index)]
-        return OFF_RES_DECK + (action.level - 1)
+            return _at(OFF_RES_PYR, _PYRAMID_TO_IDX[(action.level, action.index)],
+                       _N_RESERVE_SLOTS, 'ReserveCard/pyramid')
+        return _at(OFF_RES_DECK, action.level - 1, _N_RESERVE_DECK,
+                   'ReserveCard/deck')
 
     if isinstance(action, UseScroll):
-        return OFF_SCROLL + _cell_idx(*action.position)
+        return _at(OFF_SCROLL, _cell_idx(*action.position), _N_CELLS, 'UseScroll')
 
     if isinstance(action, EffectTakeSameGem):
-        return OFF_EFFECT_SAME + _cell_idx(*action.position)
+        return _at(OFF_EFFECT_SAME, _cell_idx(*action.position), _N_CELLS,
+                   'EffectTakeSameGem')
 
     if isinstance(action, EffectTakeOpponentGem):
-        return OFF_EFFECT_OPP + _gem_to_opp_idx(action.gem)
+        return _at(OFF_EFFECT_OPP, _gem_to_opp_idx(action.gem), _N_OPP_GEM,
+                   'EffectTakeOpponentGem')
 
     if isinstance(action, EffectChooseWildcard):
-        return OFF_EFFECT_WC + action.target_card_index
+        return _at(OFF_EFFECT_WC, action.colour, _N_WILDCARD,
+                   'EffectChooseWildcard')
+
+    if isinstance(action, EffectChooseGold):
+        return _at(OFF_EFFECT_GOLD, _cell_idx(*action.position), _N_CELLS,
+                   'EffectChooseGold')
 
     if isinstance(action, ChooseRoyal):
-        return OFF_ROYAL + action.index
+        return _at(OFF_ROYAL, action.index, _N_ROYAL, 'ChooseRoyal')
 
     if isinstance(action, DiscardToken):
-        return OFF_DISCARD + action.gem
+        return _at(OFF_DISCARD, action.gem, N_GEMS, 'DiscardToken')
 
     if isinstance(action, RefillBoard):
         return OFF_REFILL
@@ -137,6 +170,9 @@ def action_to_index(action: Action) -> int:
 
     if isinstance(action, EffectSkip):
         return OFF_SKIP
+
+    if isinstance(action, PassTurn):
+        return OFF_PASS
 
     raise ValueError(f"Unknown action type: {type(action)}")
 
@@ -179,8 +215,12 @@ def index_to_action(index: int) -> Action:
         gem = index - OFF_EFFECT_OPP
         return EffectTakeOpponentGem(gem=gem)
 
-    if OFF_EFFECT_WC <= index < OFF_ROYAL:
-        return EffectChooseWildcard(target_card_index=index - OFF_EFFECT_WC)
+    if OFF_EFFECT_WC <= index < OFF_EFFECT_GOLD:
+        return EffectChooseWildcard(colour=index - OFF_EFFECT_WC)
+
+    if OFF_EFFECT_GOLD <= index < OFF_ROYAL:
+        ci = index - OFF_EFFECT_GOLD
+        return EffectChooseGold(position=(ci // BOARD_SIZE, ci % BOARD_SIZE))
 
     if OFF_ROYAL <= index < OFF_DISCARD:
         return ChooseRoyal(index=index - OFF_ROYAL)
@@ -196,6 +236,9 @@ def index_to_action(index: int) -> Action:
 
     if index == OFF_SKIP:
         return EffectSkip()
+
+    if index == OFF_PASS:
+        return PassTurn()
 
     raise ValueError(f"Invalid action index: {index}")
 

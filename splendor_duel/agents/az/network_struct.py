@@ -28,10 +28,10 @@ entropy of ~1.62, and the gap does not close with training — held-out CE
 *rises* to 2.38 while train CE falls to 1.97. Broken down by phase, essentially
 all of that excess sits in MAIN (1.009 nats over 5796 positions).
 
-MAIN is where the take-token actions live, and they are 145 of the 265 action
+MAIN is where the take-token actions live, and they are 145 of the 278 action
 slots (55%). Each one corresponds to a fixed geometric line segment of the 5x5
 board (`constants.ALL_SEGMENTS`: 25 of length 1, 72 of length 2, 48 of length
-3). A flat `Linear(hidden, 265)` has to learn, separately for each of those 145
+3). A flat `Linear(hidden, 278)` has to learn, separately for each of those 145
 slots, which cells of a 200-dim flattened one-hot board it should read. Nothing
 ties slot 37 to the three cells it actually covers, and nothing lets "take three
 red" generalise from one part of the board to another.
@@ -50,7 +50,8 @@ computed from that slot's own 17-dim card encoding rather than from its index.
 The remaining 96 slots (scroll, effects, royal, discard, refill/proceed/skip)
 keep a flat head — they are few, and not positionally structured in the same way.
 
-Contracts preserved: OBS_SIZE stays 519 and N_ACTIONS stays 265, so action_map,
+Contracts preserved: OBS_SIZE stays 519 and every action-space offset is read
+from action_map rather than hardcoded, so action_map,
 legal_mask, mcts_az, self_play_v2 and the trainer are all unchanged. Only the
 parameters differ, so this does NOT load older checkpoints.
 """
@@ -165,7 +166,7 @@ class AZStructuredNetwork(nn.Module):
         B = obs.shape[0]
         feat = self.shared(obs)
         ctx = self.ctx_proj(feat)                                  # [B, ctx]
-        flat = self.flat_head(feat)                                # [B, 265]
+        flat = self.flat_head(feat)                                # [B, N_ACTIONS]
 
         # ── Take-token logits from the cells each segment covers ──
         board = obs[:, :_BOARD_END].view(B, _N_CELLS, _CELL_CH)
@@ -187,13 +188,13 @@ class AZStructuredNetwork(nn.Module):
         reserve = self.reserve_head(card_ctx).squeeze(-1)          # [B, 12]
 
         # Reassemble in action_map order; slices between structured blocks come
-        # from the flat head so every one of the 265 slots is covered exactly once.
+        # from the flat head so every one of the N_ACTIONS slots is covered exactly once.
         logits = torch.cat([
             take,                              # [0, 145)   TakeTokens
             buy,                               # [145, 157) BuyCard pyramid
             flat[:, OFF_BUY_RES:OFF_RES_PYR],  # [157, 160) BuyCard reserve
             reserve,                           # [160, 172) ReserveCard pyramid
-            flat[:, OFF_RES_DECK:],            # [172, 265) everything else
+            flat[:, OFF_RES_DECK:],            # [172, N_ACTIONS) everything else
         ], dim=1).clamp(-15, 15)
 
         return logits, torch.tanh(self.value_head(feat))

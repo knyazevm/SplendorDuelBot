@@ -38,8 +38,12 @@ class RolloutBuffer:
     rewards: list = field(default_factory=list)
     dones: list = field(default_factory=list)
     masks: list = field(default_factory=list)
+    # Which player acted on each transition.  Needed only for self-play, where
+    # both sides share one buffer and the terminal reward has to be routed to
+    # each of them separately (see assign_final_rewards).
+    actors: list = field(default_factory=list)
 
-    def add(self, obs, action, log_prob, value, reward, done, mask):
+    def add(self, obs, action, log_prob, value, reward, done, mask, actor=0):
         self.obs.append(obs)
         self.actions.append(action)
         self.log_probs.append(log_prob)
@@ -47,10 +51,36 @@ class RolloutBuffer:
         self.rewards.append(reward)
         self.dones.append(done)
         self.masks.append(mask)
+        self.actors.append(actor)
+
+    def assign_final_rewards(self, final_rewards: dict) -> None:
+        """
+        Overwrite each player's last transition of the current episode with
+        their actual game outcome.
+
+        Self-play interleaves both players into this one buffer, and the game
+        can only end on the winner's own move — so the scalar step() returns is
+        structurally always +1, and the loser's final transition would carry a
+        reward of 0.  Without this the terminal signal is a constant and the
+        value head never sees a loss.
+        """
+        # Stay inside the episode that just ended: anything at or before the
+        # previous `done` belongs to an earlier game in the same rollout.
+        start = 0
+        for i in range(len(self.dones) - 2, -1, -1):
+            if self.dones[i]:
+                start = i + 1
+                break
+        for player, r in final_rewards.items():
+            for i in range(len(self.rewards) - 1, start - 1, -1):
+                if self.actors[i] == player:
+                    self.rewards[i] = float(r)
+                    break
 
     def clear(self):
         for lst in [self.obs, self.actions, self.log_probs,
-                     self.values, self.rewards, self.dones, self.masks]:
+                     self.values, self.rewards, self.dones, self.masks,
+                     self.actors]:
             lst.clear()
 
     def __len__(self):
@@ -195,6 +225,9 @@ class PPOTrainer:
             self.network.eval()
 
             for _ in range(self.n_steps):
+                # Who is about to act — captured before the step, since info
+                # is replaced by the one describing the NEXT position.
+                actor = info["current_player"]
                 action, log_prob, value = self.network.get_action(obs_t, mask_t)
                 obs_np, reward, done, truncated, info = self.env.step(action)
                 ep_rewards += reward
@@ -207,13 +240,24 @@ class PPOTrainer:
                     reward=reward,
                     done=float(done or truncated),
                     mask=mask_t.cpu().numpy(),
+                    actor=actor,
                 )
                 steps_done += 1
 
                 if done or truncated:
                     self.total_games += 1
-                    win = 1.0 if reward > 0 else 0.0
-                    ep_wins.append(win)
+                    final_rewards = info.get("final_rewards")
+                    if final_rewards is not None:
+                        self.buffer.assign_final_rewards(final_rewards)
+
+                    if self.env.self_play:
+                        # Both seats are the same network, so a "win rate"
+                        # here is 0.5 by construction; recording `reward > 0`
+                        # would log a flat 100%, since step() reports the
+                        # winner's reward.
+                        pass
+                    else:
+                        ep_wins.append(1.0 if reward > 0 else 0.0)
                     ep_rewards = 0.0
 
                     # Curriculum: switch opponent based on progress

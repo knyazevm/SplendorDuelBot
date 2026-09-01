@@ -24,29 +24,46 @@ Layout: the original 519 dims verbatim, then 74 appended, so a v1 network's
 learned features map onto the same input positions.
 
     opponent reserved   3 x 17 = 51
-    pending_effect one-hot     =  5
+    pending_effect one-hot     =  7
     pending_card               = 17
     extra_turn_flag            =  1
-    ------------------------------- 74      OBS_SIZE_V2 = 593
+    ------------------------------- 76      OBS_SIZE_V2 = 595
 """
 from __future__ import annotations
 
 import numpy as np
 
-from splendor_duel.game.constants import MAX_RESERVED
+from splendor_duel.game.constants import MAX_RESERVED, PENDING_EFFECTS
 from splendor_duel.game.state import GameState
 
 from .observation import (
     OBS_SIZE, _ABILITY_IDS, _CARD_DIM, _encode_card, encode_state,
 )
 
+# `pending_effect` is NOT the same domain as a card's `ability`, which is what
+# _ABILITY_IDS enumerates.  The engine also parks synthetic effects there
+# ('choose_wildcard' after buying a wildcard card, 'choose_gold' after
+# reserving with several golds on the board), and those are absent from
+# _ABILITY_IDS — so a `.get(..., 0)` lookup silently folded them onto slot 0,
+# the same slot as "no effect pending".  The network was asked to pick a bonus
+# colour from a position that looked identical to one with nothing to resolve.
+#
+# Built from constants.PENDING_EFFECTS, which is the engine's own list, so a
+# new effect widens this table automatically instead of going missing.  Ids
+# for the shared card abilities are pinned to _ABILITY_IDS so the two encodings
+# cannot drift apart.
+_PENDING_EFFECT_IDS: dict[str | None, int] = {None: 0, **_ABILITY_IDS}
+for _e in PENDING_EFFECTS:
+    if _e not in _PENDING_EFFECT_IDS:
+        _PENDING_EFFECT_IDS[_e] = len(_PENDING_EFFECT_IDS)
+
 _N_OPP_RESERVED = MAX_RESERVED * _CARD_DIM   # 51
-_N_PENDING_EFFECT = 5
+_N_PENDING_EFFECT = len(_PENDING_EFFECT_IDS)  # 7
 _N_PENDING_CARD = _CARD_DIM                  # 17
 _N_EXTRA_TURN = 1
 
-_N_EXTRA = _N_OPP_RESERVED + _N_PENDING_EFFECT + _N_PENDING_CARD + _N_EXTRA_TURN  # 74
-OBS_SIZE_V2 = OBS_SIZE + _N_EXTRA                                                 # 593
+_N_EXTRA = _N_OPP_RESERVED + _N_PENDING_EFFECT + _N_PENDING_CARD + _N_EXTRA_TURN  # 76
+OBS_SIZE_V2 = OBS_SIZE + _N_EXTRA                                                 # 595
 
 
 def encode_state_v2(state: GameState) -> np.ndarray:
@@ -63,8 +80,17 @@ def encode_state_v2(state: GameState) -> np.ndarray:
         else:
             off += _CARD_DIM
 
-    # Which ability is being resolved right now.
-    obs[off + _ABILITY_IDS.get(state.pending_effect, 0)] = 1.0
+    # Which effect is being resolved right now.  Indexed, not `.get`-ed: a
+    # pending effect the table does not know about is a bug to surface, not a
+    # value to quietly encode as "nothing pending".
+    try:
+        effect_id = _PENDING_EFFECT_IDS[state.pending_effect]
+    except KeyError:
+        raise KeyError(
+            f"pending_effect {state.pending_effect!r} is missing from "
+            f"_PENDING_EFFECT_IDS; add it and widen _N_PENDING_EFFECT"
+        ) from None
+    obs[off + effect_id] = 1.0
     off += _N_PENDING_EFFECT
 
     # The card that triggered it.

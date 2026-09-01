@@ -1,0 +1,22 @@
+__pycache__/
+checkpoints/
+checkpoints_az/
+checkpoints_az_512x4/
+checkpoints_az_lr1e-1/
+checkpoints_az_lr1e-2/
+checkpoints_az_tuned/
+*.pyc
+CLAUDE.md
+training_log.txt
+
+# --- added: session artifacts ---
+experiments/
+checkpoints_az_v2/
+checkpoints_az_v2_s256/
+checkpoints_az_v2_sparse/
+checkpoints_az_v2_sparse2/
+checkpoints_az_v2_sparse_CONTAMINATED/
+checkpoints_az_pretrained/
+*.log
+*.pkl
+*.pid

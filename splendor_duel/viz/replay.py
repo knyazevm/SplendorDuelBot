@@ -13,7 +13,7 @@ import numpy as np
 
 from splendor_duel.game.actions import (
     Action, BuyCard, ChooseRoyal, DiscardToken,
-    EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem,
+    EffectChooseGold, EffectChooseWildcard, EffectSkip, EffectTakeOpponentGem, PassTurn,
     EffectTakeSameGem, Phase, ProceedToMain, RefillBoard,
     ReserveCard, TakeTokens, UseScroll,
 )
@@ -154,11 +154,16 @@ def describe_action(action: Action, state: Optional[GameState] = None) -> str:
                     card_id = f' {res[action.index].id}'
             return f"Bought{card_id} from reserve"
 
+    if isinstance(action, PassTurn):
+        return "Passed (no legal move)"
+
     if isinstance(action, EffectChooseWildcard):
-        if state:
-            target = state.active.cards[action.target_card_index]
-            return f"Wildcard → placed on {target.id}"
-        return f"Wildcard → target card #{action.target_card_index}"
+        colour = GEM_LABELS.get(action.colour, '?')
+        return f"Wildcard → {colour} bonus"
+
+    if isinstance(action, EffectChooseGold):
+        r, c = action.position
+        return f"Took gold from ({r},{c})"
 
     if isinstance(action, EffectTakeSameGem):
         r, c = action.position
