@@ -18,7 +18,7 @@ from splendor_duel.game.state import GameState
 from splendor_duel.env.observation import encode_state
 from splendor_duel.env.action_map import action_to_index, legal_mask, N_ACTIONS
 from ..base_agent import BaseAgent
-from .network import SplendorNetwork
+from .network import SplendorNetwork, load_network_from_checkpoint
 
 
 class PPOAgent(BaseAgent):
@@ -52,10 +52,7 @@ class PPOAgent(BaseAgent):
             device: str = "cpu",
     ) -> PPOAgent:
         """Load a trained model from checkpoint."""
-        network = SplendorNetwork()
-        data = torch.load(path, map_location=device, weights_only=False)
-        network.load_state_dict(data["network"])
-        network.to(device)
+        network, data = load_network_from_checkpoint(path, device=device)
         name = f"PPO({data.get('total_updates', '?')})"
         return cls(network=network, deterministic=deterministic, device=device, name=name)
 

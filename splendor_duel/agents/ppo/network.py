@@ -15,22 +15,29 @@ from torch.distributions import Categorical
 
 from splendor_duel.env import OBS_SIZE, N_ACTIONS
 
+# Current default trunk. LEGACY_HIDDEN_SIZES reproduces the original
+# 519->256->128 architecture, for training/comparing against models from
+# before the trunk was widened.
+DEFAULT_HIDDEN_SIZES: tuple[int, ...] = (512, 512, 512, 512)
+LEGACY_HIDDEN_SIZES: tuple[int, ...] = (256, 128)
+
 
 class SplendorNetwork(nn.Module):
 
-    def __init__(self, hidden1: int = 256, hidden2: int = 128):
+    def __init__(self, hidden_sizes: tuple[int, ...] = DEFAULT_HIDDEN_SIZES):
         super().__init__()
+        self.hidden_sizes = tuple(hidden_sizes)
+
         # Shared backbone with LayerNorm for stability
-        self.shared = nn.Sequential(
-            nn.Linear(OBS_SIZE, hidden1),
-            nn.LayerNorm(hidden1),
-            nn.ReLU(),
-            nn.Linear(hidden1, hidden2),
-            nn.LayerNorm(hidden2),
-            nn.ReLU(),
-        )
-        self.policy_head = nn.Linear(hidden2, N_ACTIONS)
-        self.value_head = nn.Linear(hidden2, 1)
+        layers: list[nn.Module] = []
+        in_size = OBS_SIZE
+        for h in self.hidden_sizes:
+            layers += [nn.Linear(in_size, h), nn.LayerNorm(h), nn.ReLU()]
+            in_size = h
+        self.shared = nn.Sequential(*layers)
+
+        self.policy_head = nn.Linear(in_size, N_ACTIONS)
+        self.value_head = nn.Linear(in_size, 1)
 
         # Small init for policy (near-uniform initial distribution)
         nn.init.orthogonal_(self.policy_head.weight, gain=0.01)
@@ -102,3 +109,37 @@ class SplendorNetwork(nn.Module):
 
         dist = Categorical(probs=probs, validate_args=False)
         return dist.log_prob(actions), values, dist.entropy()
+
+
+def infer_hidden_sizes(network_state_dict: dict) -> tuple[int, ...]:
+    """
+    Recover a SplendorNetwork's hidden_sizes from a saved state_dict.
+
+    `shared` is a flat Sequential of repeating (Linear, LayerNorm, ReLU)
+    triples, so Linear layers sit at indices 0, 3, 6, ... Each one's output
+    width (weight.shape[0]) is one hidden layer size. This lets any checkpoint
+    — old 519->256->128 or the current wider trunk — be loaded without the
+    caller needing to know its architecture ahead of time.
+    """
+    sizes = []
+    i = 0
+    while f"shared.{i}.weight" in network_state_dict:
+        sizes.append(int(network_state_dict[f"shared.{i}.weight"].shape[0]))
+        i += 3
+    return tuple(sizes)
+
+
+def load_network_from_checkpoint(path: str, device: str = "cpu") -> tuple[SplendorNetwork, dict]:
+    """
+    Load a SplendorNetwork whose architecture may differ from the current
+    default — sized to match whatever's actually in the checkpoint.
+
+    Returns (network, raw_checkpoint_dict) so callers can still read other
+    saved fields (total_iterations, etc.) off the dict.
+    """
+    data = torch.load(path, map_location=device, weights_only=False)
+    state_dict = data["network"] if isinstance(data, dict) and "network" in data else data
+    network = SplendorNetwork(hidden_sizes=infer_hidden_sizes(state_dict))
+    network.load_state_dict(state_dict)
+    network.to(device)
+    return network, (data if isinstance(data, dict) else {})

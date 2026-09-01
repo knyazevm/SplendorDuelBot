@@ -15,6 +15,7 @@ Loss:
 from __future__ import annotations
 
 import copy
+import pickle
 import random
 import time
 from collections import deque
@@ -28,7 +29,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from splendor_duel.env import OBS_SIZE, N_ACTIONS
-from splendor_duel.agents.ppo.network import SplendorNetwork
+from splendor_duel.agents.ppo.network import (
+    SplendorNetwork, DEFAULT_HIDDEN_SIZES, infer_hidden_sizes,
+)
 
 from .self_play import TrainingExample, generate_batch
 
@@ -59,6 +62,17 @@ class ReplayBuffer:
         mask = np.stack([e.mask for e in batch])
         return obs, policy, value, mask
 
+    def save(self, path: str):
+        """Dump the buffer's contents to disk (overwrites path)."""
+        with open(path, "wb") as f:
+            pickle.dump(list(self.buffer), f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load(self, path: str):
+        """Replace the buffer's contents with examples from disk."""
+        with open(path, "rb") as f:
+            examples = pickle.load(f)
+        self.buffer = deque(examples, maxlen=self.capacity)
+
 
 class AZTrainer:
     """
@@ -76,6 +90,10 @@ class AZTrainer:
         dirichlet_eps:   root noise for exploration
         device:          "cpu" or "cuda"
         init_checkpoint: optional PPO checkpoint to warm-start network
+        hidden_sizes:    trunk layer widths for a freshly-initialised network
+                         (ignored if init_checkpoint is given — the checkpoint's
+                         own architecture wins, since you can't load mismatched
+                         shapes anyway)
     """
 
     def __init__(
@@ -98,6 +116,7 @@ class AZTrainer:
         eval_every: int = 0,
         eval_games: int = 10,
         eval_opponents: Optional[list[str]] = None,
+        hidden_sizes: tuple[int, ...] = DEFAULT_HIDDEN_SIZES,
     ):
         self.device = torch.device(device)
         self.cards_path = cards_path
@@ -114,11 +133,12 @@ class AZTrainer:
         self.eval_games = eval_games
         self.eval_opponents = eval_opponents or ["greedy"]
 
-        self.network = SplendorNetwork().to(self.device)
+        self.network = SplendorNetwork(hidden_sizes=hidden_sizes).to(self.device)
 
         if init_checkpoint:
             self._load_weights_only(init_checkpoint)
-            print(f"Initialized network from {init_checkpoint}")
+            print(f"Initialized network from {init_checkpoint} "
+                  f"(hidden_sizes={self.network.hidden_sizes})")
 
         self.optimizer = optim.Adam(
             self.network.parameters(), lr=lr, weight_decay=weight_decay,
@@ -130,10 +150,13 @@ class AZTrainer:
 
     def _load_weights_only(self, path: str):
         data = torch.load(path, map_location=self.device, weights_only=False)
-        if "network" in data:
-            self.network.load_state_dict(data["network"])
-        else:
-            self.network.load_state_dict(data)
+        state_dict = data["network"] if "network" in data else data
+        checkpoint_sizes = infer_hidden_sizes(state_dict)
+        if checkpoint_sizes != self.network.hidden_sizes:
+            # Called before self.optimizer exists, so replacing the network
+            # outright (rather than just its weights) is safe here.
+            self.network = SplendorNetwork(hidden_sizes=checkpoint_sizes).to(self.device)
+        self.network.load_state_dict(state_dict)
 
     def train(
         self,
@@ -188,13 +211,15 @@ class AZTrainer:
             if save_interval > 0 and (it + 1) % save_interval == 0:
                 path = f"{save_dir}/az_{self.total_iterations}.pt"
                 self.save(path)
-                print(f"  → Saved {path}")
+                self.buffer.save(f"{save_dir}/replay_buffer.pkl")
+                print(f"  → Saved {path} (+ buffer, {len(self.buffer)} examples)")
 
             # Periodic evaluation vs reference agents
             if self.eval_every > 0 and (it + 1) % self.eval_every == 0:
                 self._run_evaluation()
 
         self.save(f"{save_dir}/az_final.pt")
+        self.buffer.save(f"{save_dir}/replay_buffer.pkl")
         print(f"\nTraining complete: {self.total_iterations} iterations, "
               f"{self.total_games} games in {time.time()-t_start:.0f}s")
 
@@ -313,8 +338,33 @@ class AZTrainer:
 
     def load(self, path: str):
         data = torch.load(path, map_location=self.device, weights_only=False)
+        checkpoint_sizes = infer_hidden_sizes(data["network"])
+        if checkpoint_sizes != self.network.hidden_sizes:
+            # Architecture differs from what this trainer was constructed
+            # with (e.g. resuming a legacy-size checkpoint into a run started
+            # with the current default). Rebuild network + optimizer to match
+            # the checkpoint — an optimizer's state_dict only lines up with a
+            # param list of the same shapes it was saved against, so it has
+            # to be recreated here too, not just the network.
+            lr = self.optimizer.param_groups[0]["lr"]
+            weight_decay = self.optimizer.param_groups[0]["weight_decay"]
+            self.network = SplendorNetwork(hidden_sizes=checkpoint_sizes).to(self.device)
+            self.optimizer = optim.Adam(
+                self.network.parameters(), lr=lr, weight_decay=weight_decay,
+            )
+            print(f"  (resumed checkpoint uses hidden_sizes={checkpoint_sizes}, "
+                  f"rebuilt network+optimizer to match)")
         self.network.load_state_dict(data["network"])
         if "optimizer" in data:
             self.optimizer.load_state_dict(data["optimizer"])
         self.total_iterations = data.get("total_iterations", 0)
         self.total_games = data.get("total_games", 0)
+
+    def load_buffer_near(self, checkpoint_path: str) -> bool:
+        """Look for replay_buffer.pkl next to a checkpoint (see load()) and
+        restore it if present. Returns whether a buffer was found/loaded."""
+        buffer_path = Path(checkpoint_path).parent / "replay_buffer.pkl"
+        if not buffer_path.exists():
+            return False
+        self.buffer.load(str(buffer_path))
+        return True

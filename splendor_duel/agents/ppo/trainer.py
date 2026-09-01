@@ -23,7 +23,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from splendor_duel.env import SplendorDuelEnv, N_ACTIONS, OBS_SIZE
-from .network import SplendorNetwork
+from .network import SplendorNetwork, DEFAULT_HIDDEN_SIZES, infer_hidden_sizes
 
 
 # ── Rollout buffer ────────────────────────────────────────────────────────────
@@ -124,6 +124,7 @@ class PPOTrainer:
         batch_size: int = 256,
         device: str = "cpu",
         cards_path: str = "data/cards.json",
+        hidden_sizes: tuple[int, ...] = DEFAULT_HIDDEN_SIZES,
     ):
         self.device = torch.device(device)
         self.gamma = gamma
@@ -137,7 +138,7 @@ class PPOTrainer:
         self.batch_size = batch_size
         self.curriculum = curriculum
 
-        self.network = SplendorNetwork().to(self.device)
+        self.network = SplendorNetwork(hidden_sizes=hidden_sizes).to(self.device)
         self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
 
         if curriculum:
@@ -399,6 +400,15 @@ class PPOTrainer:
 
     def load(self, path: str):
         data = torch.load(path, map_location=self.device, weights_only=False)
+        checkpoint_sizes = infer_hidden_sizes(data["network"])
+        if checkpoint_sizes != self.network.hidden_sizes:
+            # See AZTrainer.load() for why both network and optimizer need
+            # rebuilding when the checkpoint's architecture doesn't match.
+            lr = self.optimizer.param_groups[0]["lr"]
+            self.network = SplendorNetwork(hidden_sizes=checkpoint_sizes).to(self.device)
+            self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
+            print(f"  (resumed checkpoint uses hidden_sizes={checkpoint_sizes}, "
+                  f"rebuilt network+optimizer to match)")
         self.network.load_state_dict(data["network"])
         self.optimizer.load_state_dict(data["optimizer"])
         self.total_games = data.get("total_games", 0)
