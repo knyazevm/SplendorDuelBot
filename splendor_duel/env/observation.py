@@ -176,23 +176,36 @@ def _encode_player(obs: np.ndarray, off: int, player) -> int:
     return off
 
 
+CARD_ENC_SIZE = 2 * N_GEMS + 3
+
+# card.id → its CARD_ENC_SIZE encoding. Cards are frozen dataclasses loaded
+# once from cards.json, so a card's encoding never changes; building it with
+# per-element numpy assignment on every call was ~6% of self-play time.
+_CARD_ENC_CACHE: dict[str, np.ndarray] = {}
+
+
+def _card_encoding(card) -> np.ndarray:
+    """Return (and memoise) the fixed encoding of one card."""
+    enc = _CARD_ENC_CACHE.get(card.id)
+    if enc is None:
+        enc = np.zeros(CARD_ENC_SIZE, dtype=np.float32)
+        # Cost (normalised by 8)
+        for i in range(N_GEMS):
+            enc[i] = float(card.cost[i]) / 8.0
+        # Bonus (normalised — double bonus cards have value 2); wildcards and
+        # bonus-less cards leave this block at zero.
+        if card.gem_bonus is not None:
+            for i in range(N_GEMS):
+                enc[N_GEMS + i] = float(card.gem_bonus[i]) / 2.0
+        # Points, crowns, wildcard flag
+        enc[2 * N_GEMS] = card.points / 6.0
+        enc[2 * N_GEMS + 1] = card.crowns / 3.0
+        enc[2 * N_GEMS + 2] = 1.0 if card.is_wildcard else 0.0
+        _CARD_ENC_CACHE[card.id] = enc
+    return enc
+
+
 def _encode_card(obs: np.ndarray, off: int, card) -> int:
     """Encode a single card into obs at offset. Returns new offset."""
-    # Cost (normalised by 8)
-    for i in range(N_GEMS):
-        obs[off + i] = float(card.cost[i]) / 8.0
-    off += N_GEMS
-
-    # Bonus (normalised — double bonus cards have value 2)
-    if card.gem_bonus is not None:
-        for i in range(N_GEMS):
-            obs[off + i] = float(card.gem_bonus[i]) / 2.0
-    off += N_GEMS
-
-    # Points, crowns, wildcard flag
-    obs[off] = card.points / 6.0
-    obs[off + 1] = card.crowns / 3.0
-    obs[off + 2] = 1.0 if card.is_wildcard else 0.0
-    off += 3
-
-    return off
+    obs[off:off + CARD_ENC_SIZE] = _card_encoding(card)
+    return off + CARD_ENC_SIZE

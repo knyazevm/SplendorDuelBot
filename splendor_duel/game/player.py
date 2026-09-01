@@ -29,6 +29,9 @@ from .constants import (
 )
 
 
+_GOLD = int(Gem.GOLD)  # plain int: comparing against the IntEnum is slower
+
+
 class PlayerState:
     __slots__ = (
         'tokens', 'bonuses', 'cards', 'reserved', 'scrolls',
@@ -132,8 +135,24 @@ class PlayerState:
     # ── Affordability ─────────────────────────────────────────────────────────
 
     def can_afford(self, card: Card) -> bool:
-        """Check if the player can buy this card (with gold substitution)."""
-        return self.compute_payment(card) is not None
+        """
+        Check if the player can buy this card (with gold substitution).
+
+        Pure-python on purpose: this runs hundreds of thousands of times per
+        self-play game, and numpy's per-call overhead dwarfs the actual work
+        on 7-element vectors. Bails out as soon as the gold runs short.
+        """
+        tokens = self.tokens.tolist()
+        bonuses = self.bonuses.tolist()
+        cost = card.cost
+        gold_left = tokens[_GOLD]
+        for i in range(_GOLD):  # indices 0..5; cards never cost gold
+            short = cost[i] - bonuses[i] - tokens[i]
+            if short > 0:
+                gold_left -= short
+                if gold_left < 0:
+                    return False
+        return True
 
     def compute_payment(self, card: Card) -> Optional[np.ndarray]:
         """
@@ -142,22 +161,27 @@ class PlayerState:
         Returns an int8 vector (length N_GEMS) of tokens to spend.
         Gold tokens fill any shortfall in specific colours.
         """
-        cost = np.array(card.cost, dtype=np.int8)
-        # Reduce cost by permanent bonuses (bonuses never include pearl or gold)
-        needed = np.maximum(cost - self.bonuses, 0)
-        # Pay with same-colour tokens (excluding gold slot for now)
-        paid = np.minimum(needed, self.tokens)
-        # Gold covers the rest
-        shortfall = needed - paid
-        # Gold needed (for all non-gold gem types)
-        gold_needed = int(shortfall[:Gem.GOLD].sum())  # indices 0..5
-        # Pearl shortfall is also covered by gold
-        # (shortfall already includes pearl at index PEARL)
-        if gold_needed > self.tokens[Gem.GOLD]:
+        tokens = self.tokens.tolist()
+        bonuses = self.bonuses.tolist()
+        cost = card.cost
+        payment = [0] * N_GEMS
+        gold_needed = 0
+        for i in range(_GOLD):  # indices 0..5; cards never cost gold
+            # Reduce cost by permanent bonuses (never pearl or gold)
+            needed = cost[i] - bonuses[i]
+            if needed <= 0:
+                continue
+            have = tokens[i]
+            if have >= needed:
+                payment[i] = needed
+            else:
+                # Pay what we can in colour; gold covers the rest
+                payment[i] = have
+                gold_needed += needed - have
+        if gold_needed > tokens[_GOLD]:
             return None  # can't afford
-        payment = paid.copy()
-        payment[Gem.GOLD] = gold_needed
-        return payment
+        payment[_GOLD] = gold_needed
+        return np.array(payment, dtype=np.int8)
 
     # ── Victory conditions ────────────────────────────────────────────────────
 

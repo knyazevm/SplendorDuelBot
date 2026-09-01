@@ -64,6 +64,25 @@ def _build_segments() -> list[tuple[tuple[int, int], ...]]:
 
 ALL_SEGMENTS: list[tuple[tuple[int, int], ...]] = _build_segments()
 
+# Every (row, col) on the board in row-major order — matches the flat order of
+# grid.reshape(-1), so callers can zip the two together.
+ALL_POSITIONS: list[tuple[int, int]] = [
+    (r, c) for r in range(BOARD_SIZE) for c in range(BOARD_SIZE)
+]
+
+# Bitmask form of ALL_SEGMENTS: bit (r * BOARD_SIZE + c) is set for every cell
+# in the segment. Lets get_legal_take_positions() test a whole segment with one
+# integer AND instead of per-segment numpy indexing.
+SEGMENT_MASKS: list[tuple[tuple[tuple[int, int], ...], int]] = [
+    (seg, sum(1 << (r * BOARD_SIZE + c) for r, c in seg))
+    for seg in ALL_SEGMENTS
+]
+
+# Plain-int copies of the board sentinels — comparing against the np.int8 /
+# IntEnum originals goes through numpy's scalar protocol and is ~40% slower.
+EMPTY_INT: int = int(EMPTY)
+GOLD_INT: int = int(Gem.GOLD)
+
 # ── Pyramid layout ────────────────────────────────────────────────────────────
 PYRAMID_OPEN: dict[int, int] = {1: 5, 2: 4, 3: 3}  # visible cards per level
 

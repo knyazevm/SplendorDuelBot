@@ -18,10 +18,13 @@ from typing import Optional
 import numpy as np
 
 from .constants import (
-    ALL_SEGMENTS,
+    ALL_POSITIONS,
     BOARD_SIZE,
     BOARD_SPIRAL,
     EMPTY,
+    EMPTY_INT,
+    GOLD_INT,
+    SEGMENT_MASKS,
     TOKEN_COUNTS,
     Gem,
     GEM_NAMES,
@@ -118,21 +121,17 @@ class Board:
         - Special privilege trigger (3 of same colour, 2 pearls) is noted
           in apply_take but NOT filtered here — all valid geometries are returned.
 
-        Uses pre-computed ALL_SEGMENTS for speed; checks are vectorised over
-        the segment cells via numpy fancy indexing.
+        Builds a 25-bit mask of unusable (empty or gold) cells, then keeps every
+        pre-computed segment mask (SEGMENT_MASKS) that shares no bit with it.
+        `.tolist()` is the only numpy call: it unboxes all 25 cells to native
+        ints in one shot, so the per-cell loop never re-enters numpy.
         """
-        grid = self._grid
-        legal: list[tuple[tuple[int, int], ...]] = []
+        blocked = 0
+        for i, v in enumerate(self._grid.reshape(-1).tolist()):
+            if v == EMPTY_INT or v == GOLD_INT:
+                blocked |= 1 << i
 
-        for seg in ALL_SEGMENTS:
-            rows = np.array([r for r, _ in seg], dtype=np.int8)
-            cols = np.array([c for _, c in seg], dtype=np.int8)
-            values = grid[rows, cols]
-            # All cells must be non-empty and non-gold
-            if np.all(values != EMPTY) and np.all(values != Gem.GOLD):
-                legal.append(seg)
-
-        return legal
+        return [seg for seg, mask in SEGMENT_MASKS if not (mask & blocked)]
 
     def get_legal_single_positions(
         self, exclude_gold: bool = True
@@ -141,16 +140,13 @@ class Board:
         Return all cells with a token (optionally excluding gold).
         Used for scroll-spend token selection.
         """
-        legal = []
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                v = self._grid[r, c]
-                if v == EMPTY:
-                    continue
-                if exclude_gold and v == Gem.GOLD:
-                    continue
-                legal.append((r, c))
-        return legal
+        cells = self._grid.reshape(-1).tolist()
+        if exclude_gold:
+            return [
+                pos for pos, v in zip(ALL_POSITIONS, cells)
+                if v != EMPTY_INT and v != GOLD_INT
+            ]
+        return [pos for pos, v in zip(ALL_POSITIONS, cells) if v != EMPTY_INT]
 
     def has_gold(self) -> bool:
         return bool(np.any(self._grid == Gem.GOLD))
